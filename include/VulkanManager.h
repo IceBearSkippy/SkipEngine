@@ -1,12 +1,19 @@
-#define GLFW_INCLUDE_VULKAN
-
 #include <vulkan/vulkan.h>
+
+#include <VulkanWindow.h>
 
 namespace Skip {
 
 	class VulkanManager {
 	public:
-		VulkanManager();
+		VulkanManager(VulkanWindow window);
 		~VulkanManager();
+
+
+	private:
+		VkInstance instance;
+		VulkanWindow vkWindow;
 	};
+
+
 }
