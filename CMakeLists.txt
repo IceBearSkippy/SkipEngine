@@ -10,16 +10,14 @@ set ( INCLUDE_FOLDER ./include )
 set ( LIBS_FOLDER ./libs )
 
 set ( VULKAN_SDK C:/VulkanSDK/1.2.135.0 )
-set ( GLFW_INCLUDE_DIRECTORIES C:/OpenGL/glfw/include )
-set ( GLFW_STATIC_LIBRARIES C:/OpenGL/glfw/lib-vc2019 )
 find_package ( PkgConfig )
 find_package( Vulkan REQUIRED )
+find_package( glfw3 REQUIRED )
 
 list ( APPEND PROJECT_INCLUDE_DIRECTORIES 
   ${SOURCE_FOLDER}
   ${INCLUDE_FOLDER}
   ${LIBS_FOLDER}
-  ${GLFW_INCLUDE_DIRECTORIES}
   ${VULKAN_SDK}/Include
 )
 
@@ -41,6 +39,6 @@ find_library( VULKAN_SDK
 )
 
 target_link_libraries( ${APP_NAME}
-  ${GLFW_STATIC_LIBRARIES}
   ${VULKAN_SDK}
+  glfw
 )
