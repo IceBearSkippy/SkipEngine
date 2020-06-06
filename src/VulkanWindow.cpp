@@ -4,13 +4,13 @@ using namespace std;
 
 const uint32_t DEFAULT_WINDOW_WIDTH = 800;
 const uint32_t DEFAULT_WINDOW_HEIGHT = 600;
-
+const char* DEFAULT_WINDOW_NAME = "Skip";
 
 namespace Skip {
 	VulkanWindow::VulkanWindow() {
 		_width = DEFAULT_WINDOW_WIDTH;
 		_height = DEFAULT_WINDOW_HEIGHT;
-		_title = "Skip it up";
+		_title = DEFAULT_WINDOW_NAME;
 	}
 
 	VulkanWindow::VulkanWindow(uint32_t width, uint32_t height, char* title) {
@@ -20,7 +20,8 @@ namespace Skip {
 	}
 
 	VulkanWindow::~VulkanWindow() {
-
+		glfwDestroyWindow(_glfw);
+		glfwTerminate();
 	}
 
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
@@ -41,4 +42,5 @@ namespace Skip {
 	bool VulkanWindow::shouldClose() {
 		return glfwWindowShouldClose(_glfw);
 	}
+
 }
