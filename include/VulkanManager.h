@@ -35,14 +35,27 @@ namespace Skip {
 
 		VulkanWindow* _window;
 		bool _enableValidationLayers;
-		
 		std::vector<const char*> _validationLayers;
 		std::vector<const char*> getRequiredExtensions();
-		void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+		
 
 	private:
 		void createInstance();
+		void createSurface();
+
+
+		VkDebugUtilsMessengerEXT _debugMessenger;
+		void setupDebugMessenger();
+
+		void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 		VkInstance _instance = VK_NULL_HANDLE;
+		VkResult createDebugUtilsMessengerEXT(VkInstance instance, const
+			VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const
+			VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT*
+			pDebugMessenger);
+		void destroyDebugUtilsMessengerEXT(VkInstance instance,
+			VkDebugUtilsMessengerEXT debugMessenger, const
+			VkAllocationCallbacks* pAllocator);
 	};
 
 

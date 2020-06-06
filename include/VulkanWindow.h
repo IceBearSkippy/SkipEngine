@@ -10,6 +10,7 @@
 namespace Skip {
 
 	class VulkanWindow {
+		// Manages glfw and VkSurface
 	public:
 		VulkanWindow();
 		VulkanWindow(uint32_t width, uint32_t height, char* title);
@@ -23,7 +24,7 @@ namespace Skip {
 
 		bool _framebufferResized = false;
 		GLFWwindow* _glfw;
-		VkSurfaceKHR _surface;
+		VkSurfaceKHR _surface = VK_NULL_HANDLE;
 	private:
 		
 
