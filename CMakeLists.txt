@@ -2,9 +2,11 @@
 
 project ("SkipEngine")
 
-set ( CMAKE_CXX_FLAGS "-std=c++17 -g" )
+set ( CMAKE_CXX_STANDARD 17 )
+set ( CMAKE_CXX_STANDARD_REQUIRED ON )
+set ( CMAKE_CXX_EXTENSIONS OFF )
 set ( APP_NAME SkipEngine )
-# TODO Fix glfw link
+
 set ( SOURCE_FOLDER ./src )
 set ( INCLUDE_FOLDER ./include )
 set ( LIBS_FOLDER ./libs )
@@ -38,7 +40,6 @@ find_library( VULKAN_SDK
   PATHS ${VULKAN_SDK}/Lib
 )
 
-target_link_libraries( ${APP_NAME}
-  ${VULKAN_SDK}
-  glfw
-)
+target_link_libraries( ${APP_NAME} glfw )
+
+target_link_libraries( ${APP_NAME} ${VULKAN_SDK}/Lib/vulkan-1.lib )
