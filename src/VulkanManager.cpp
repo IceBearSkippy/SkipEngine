@@ -1,5 +1,6 @@
 #include <VulkanManager.h>
 #include <VulkanWindow.h>
+#include <VulkanDevice.h>
 
 namespace Skip {
 
@@ -9,10 +10,13 @@ namespace Skip {
         _instance = VK_NULL_HANDLE;
 	};
     void VulkanManager::init() {
-        // create vulkan instance
+        // create vulkan instance and surface
         this->createInstance();
         this->setupDebugMessenger();
         this->createSurface();
+        this->queryPhysicalDevices();
+        _vulkanDevice = VulkanDevice::VulkanDevice(this, this->pickPhysicalDevice());
+        
     };
 
     VulkanManager::~VulkanManager() {
@@ -166,6 +170,82 @@ namespace Skip {
     void VulkanManager::createSurface() {
         if (glfwCreateWindowSurface(_instance, _window->_glfw, nullptr, &(_window->_surface)) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create window surface!");
+        }
+    }
+
+    void VulkanManager::queryPhysicalDevices() {
+        // Grab physical devices available and store into vectore _gpuDevices
+        uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices(_instance, &deviceCount, nullptr);
+        if (deviceCount == 0) {
+            throw std::runtime_error("Failed to find GPUs with Vulkan support");
+        }
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(_instance, &deviceCount, devices.data());
+
+        //Family indices might need to be added to gpu info
+        for (const auto& device : devices) {
+            GPUInfo gpu = createGPUInfo(device);
+            _gpuDevices.push_back(gpu);
+        }
+
+        std::sort(_gpuDevices.begin(), _gpuDevices.end(), GPUInfo::compareByScore);
+    }
+
+    GPUInfo VulkanManager::createGPUInfo(VkPhysicalDevice device) {
+        GPUInfo gpuInfo;
+
+        VkPhysicalDeviceProperties deviceProperties;
+        VkPhysicalDeviceFeatures deviceFeatures;
+        vkGetPhysicalDeviceProperties(device, &deviceProperties);
+        vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+        VkPhysicalDeviceProperties physicalDeviceProperties;
+        vkGetPhysicalDeviceProperties(device, &physicalDeviceProperties);
+
+        VkSampleCountFlagBits msaaSamples = this->getMaxUsableSampleCount(device);
+
+        int score = 0;
+        // Discrete GPUs have a significant performance advantage
+        // Add any other properties of interest
+        if (deviceProperties.deviceType ==
+            VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+            score += 1000;
+        }
+
+        // Maximum possible size of textures affects graphics quality
+        score += deviceProperties.limits.maxImageDimension2D;
+        gpuInfo.device = device;
+        gpuInfo.features = deviceFeatures;
+        gpuInfo.properties = deviceProperties;
+        gpuInfo.msaaSamples = getMaxUsableSampleCount(device);
+        gpuInfo.score = score;
+        return gpuInfo;
+    }
+
+    VkSampleCountFlagBits VulkanManager::getMaxUsableSampleCount(VkPhysicalDevice device) {
+        VkPhysicalDeviceProperties physicalDeviceProperties;
+        vkGetPhysicalDeviceProperties(device, &physicalDeviceProperties);
+
+        VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts &
+            physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+        if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }
+        if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
+        if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
+        if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
+        if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
+        if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
+
+        return VK_SAMPLE_COUNT_1_BIT;
+
+    }
+
+    GPUInfo* VulkanManager::pickPhysicalDevice() {
+        // we pick the first device we have by default
+        if (_gpuDevices.size() > 0) {
+            return &_gpuDevices.front();
+        } else {
+            throw std::runtime_error("Failed to find a suitable GPU!");
         }
     }
 }

@@ -6,7 +6,9 @@
 #include <optional>
 #include <vector>
 #include <iostream>
+#include <algorithm>
 
+#include <VulkanDevice.h>
 
 const std::string ENGINE_NAME = "SkipEngine";
 const uint32_t ENGINE_VERSION = VK_MAKE_VERSION(1, 2, 1);
@@ -21,6 +23,18 @@ namespace Skip {
 		std::optional<uint32_t> graphicsFamily;
 		std::optional<uint32_t> presentFamily;
 		bool isComplete();
+	};
+
+	struct GPUInfo {
+		VkPhysicalDevice device;
+		VkPhysicalDeviceProperties properties;
+		VkPhysicalDeviceFeatures features;
+		VkSampleCountFlagBits msaaSamples;
+		int score;
+
+		bool compareByScore(const GPUInfo& a, const GPUInfo& b) {
+			return a.score > b.score;
+		}
 	};
 
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR& surface);
@@ -38,11 +52,10 @@ namespace Skip {
 		std::vector<const char*> _validationLayers;
 		std::vector<const char*> getRequiredExtensions();
 		
-
+		VulkanDevice _vulkanDevice;
 	private:
 		void createInstance();
 		void createSurface();
-
 
 		VkDebugUtilsMessengerEXT _debugMessenger;
 		void setupDebugMessenger();
@@ -56,6 +69,13 @@ namespace Skip {
 		void destroyDebugUtilsMessengerEXT(VkInstance instance,
 			VkDebugUtilsMessengerEXT debugMessenger, const
 			VkAllocationCallbacks* pAllocator);
+
+		std::vector<GPUInfo> _gpuDevices;
+		void queryPhysicalDevices();
+		VkSampleCountFlagBits getMaxUsableSampleCount(VkPhysicalDevice device);
+		GPUInfo createGPUInfo(VkPhysicalDevice device);
+		GPUInfo* pickPhysicalDevice();
+
 	};
 
 

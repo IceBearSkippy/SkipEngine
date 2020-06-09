@@ -1,7 +1,5 @@
 #include <VulkanWindow.h>
 
-using namespace std;
-
 const uint32_t DEFAULT_WINDOW_WIDTH = 800;
 const uint32_t DEFAULT_WINDOW_HEIGHT = 600;
 const char* DEFAULT_WINDOW_NAME = "Skip";

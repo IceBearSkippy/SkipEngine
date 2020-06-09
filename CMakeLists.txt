@@ -26,6 +26,7 @@ list ( APPEND PROJECT_INCLUDE_DIRECTORIES
 list ( APPEND PROJECT_EXECUTABLE_FILES
   ${SOURCE_FOLDER}/VulkanWindow.cpp
   ${SOURCE_FOLDER}/VulkanManager.cpp
+  ${SOURCE_FOLDER}/VulkanDevice.cpp
   ${SOURCE_FOLDER}/main.cpp
 )
 
