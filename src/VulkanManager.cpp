@@ -1,6 +1,5 @@
 #include <VulkanManager.h>
 #include <VulkanWindow.h>
-#include <VulkanDevice.h>
 
 namespace Skip {
 
@@ -15,12 +14,15 @@ namespace Skip {
         this->setupDebugMessenger();
         this->createSurface();
         this->queryPhysicalDevices();
-        _vulkanDevice = VulkanDevice::VulkanDevice(this, this->pickPhysicalDevice());
+        
+        _vulkanDevice = &VulkanDevice::VulkanDevice(this->pickPhysicalDevice());
+
+        this->createLogicalDevice();
         
     };
 
     VulkanManager::~VulkanManager() {
-
+        
         if (_enableValidationLayers) {
             destroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
         }
@@ -189,7 +191,10 @@ namespace Skip {
             _gpuDevices.push_back(gpu);
         }
 
-        std::sort(_gpuDevices.begin(), _gpuDevices.end(), GPUInfo::compareByScore);
+        // sort based on score
+        std::sort(_gpuDevices.begin(), _gpuDevices.end(), [this](GPUInfo const& a, GPUInfo const& b) {
+            return a.score > b.score;
+        });
     }
 
     GPUInfo VulkanManager::createGPUInfo(VkPhysicalDevice device) {
@@ -246,6 +251,53 @@ namespace Skip {
             return &_gpuDevices.front();
         } else {
             throw std::runtime_error("Failed to find a suitable GPU!");
+        }
+    }
+
+    QueueFamilyIndices findQueueFamilies(GPUInfo gpuInfo, VkSurfaceKHR& surface) {
+
+        VkPhysicalDevice device = gpuInfo.device;
+        QueueFamilyIndices indices;
+        uint32_t queueFamilyCount = 0;
+
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+        int i = 0;
+        for (const auto& queueFamily : queueFamilies) {
+            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                indices.graphicsFamily = i;
+            }
+            VkBool32 presentSupport = false;
+            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+            if (presentSupport) {
+                indices.presentFamily = i;
+            }
+            if (indices.isComplete()) {
+                break;
+            }
+            i++;
+        }
+        return indices;
+    }
+
+    void VulkanManager::createLogicalDevice() {
+        QueueFamilyIndices indices = findQueueFamilies(*_vulkanDevice->_gpuInfo, _window->_surface);
+
+        std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+
+        std::set<uint32_t> uniqueQueueFamilies =
+        { indices.graphicsFamily.value(), indices.presentFamily.value() };
+        float queuePriority = 1.0f;
+        for (uint32_t queueFamily : uniqueQueueFamilies) {
+
+            VkDeviceQueueCreateInfo queueCreateInfo{};
+            queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+            queueCreateInfo.queueCount = 1;
+            queueCreateInfo.pQueuePriorities = &queuePriority;
+            queueCreateInfos.push_back(queueCreateInfo);
         }
     }
 }

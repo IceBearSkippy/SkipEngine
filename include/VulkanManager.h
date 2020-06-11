@@ -7,6 +7,7 @@
 #include <vector>
 #include <iostream>
 #include <algorithm>
+#include <set>
 
 #include <VulkanDevice.h>
 
@@ -31,13 +32,9 @@ namespace Skip {
 		VkPhysicalDeviceFeatures features;
 		VkSampleCountFlagBits msaaSamples;
 		int score;
-
-		bool compareByScore(const GPUInfo& a, const GPUInfo& b) {
-			return a.score > b.score;
-		}
 	};
 
-	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR& surface);
+	QueueFamilyIndices findQueueFamilies(GPUInfo gpuInfo, VkSurfaceKHR& surface);
 
 	class VulkanManager {
 	public:
@@ -52,10 +49,11 @@ namespace Skip {
 		std::vector<const char*> _validationLayers;
 		std::vector<const char*> getRequiredExtensions();
 		
-		VulkanDevice _vulkanDevice;
+		VulkanDevice* _vulkanDevice;
 	private:
 		void createInstance();
 		void createSurface();
+		void createLogicalDevice();
 
 		VkDebugUtilsMessengerEXT _debugMessenger;
 		void setupDebugMessenger();

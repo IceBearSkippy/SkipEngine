@@ -1,15 +1,17 @@
 #include <VulkanDevice.h>
-#include <VulkanManager.h>
 
 namespace Skip {
-	VulkanDevice::VulkanDevice(const VulkanManager* vkManager) {
-        _vkManager = vkManager;
-	}
+
+	VulkanDevice::VulkanDevice() { };
+	VulkanDevice::VulkanDevice(GPUInfo* gpu) {
+		_gpuInfo = gpu;
+	};
 
 	VulkanDevice::~VulkanDevice() {
 
-	}
+	};
 
-    
+	void VulkanDevice::init() {
+	};
 
 }
