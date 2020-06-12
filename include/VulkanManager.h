@@ -3,7 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include <string>
-#include <optional>
+
 #include <vector>
 #include <iostream>
 #include <algorithm>
@@ -20,21 +20,15 @@ namespace Skip {
 
 	class VulkanWindow;
 
-	struct QueueFamilyIndices {
-		std::optional<uint32_t> graphicsFamily;
-		std::optional<uint32_t> presentFamily;
-		bool isComplete();
-	};
-
-	struct GPUInfo {
-		VkPhysicalDevice device;
-		VkPhysicalDeviceProperties properties;
-		VkPhysicalDeviceFeatures features;
-		VkSampleCountFlagBits msaaSamples;
-		int score;
-	};
+	struct QueueFamilyIndices;
+	struct GPUInfo;
+	struct Queues;
 
 	QueueFamilyIndices findQueueFamilies(GPUInfo gpuInfo, VkSurfaceKHR& surface);
+
+	const std::vector<const char*> deviceExtensions = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME
+	};
 
 	class VulkanManager {
 	public:
