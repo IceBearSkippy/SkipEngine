@@ -10,6 +10,7 @@
 #include <set>
 
 #include <VulkanDevice.h>
+#include <VulkanSwapchain.h>
 
 const std::string ENGINE_NAME = "SkipEngine";
 const uint32_t ENGINE_VERSION = VK_MAKE_VERSION(1, 2, 1);
@@ -23,6 +24,8 @@ namespace Skip {
 	struct QueueFamilyIndices;
 	struct GPUInfo;
 	struct Queues;
+
+	struct SwapchainDetails;
 
 	QueueFamilyIndices findQueueFamilies(GPUInfo gpuInfo, VkSurfaceKHR& surface);
 
@@ -44,6 +47,7 @@ namespace Skip {
 		std::vector<const char*> getRequiredExtensions();
 		
 		VulkanDevice* _vulkanDevice;
+		VulkanSwapchain* _vulkanSwapchain;
 	private:
 		void createInstance();
 		void createSurface();

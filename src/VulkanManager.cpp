@@ -8,9 +8,9 @@ namespace Skip {
             presentFamily.has_value();
     }
 
-    QueueFamilyIndices findQueueFamilies(GPUInfo gpuInfo, VkSurfaceKHR& surface) {
+    QueueFamilyIndices findQueueFamilies(GPUInfo* gpuInfo, VkSurfaceKHR& surface) {
 
-        VkPhysicalDevice device = gpuInfo.device;
+        VkPhysicalDevice device = gpuInfo->device;
         QueueFamilyIndices indices;
         uint32_t queueFamilyCount = 0;
 
@@ -51,7 +51,8 @@ namespace Skip {
         _vulkanDevice = &VulkanDevice::VulkanDevice(this->pickPhysicalDevice());
 
         this->createLogicalDevice();
-        
+
+        _vulkanSwapchain = &VulkanSwapchain::VulkanSwapchain();
     };
 
     VulkanManager::~VulkanManager() {
@@ -339,4 +340,5 @@ namespace Skip {
         vkGetDeviceQueue(_vulkanDevice->getLogicalDevice(), indices.presentFamily.value(), 0, &_vulkanDevice->_queues._graphics);
         vkGetDeviceQueue(_vulkanDevice->getLogicalDevice(), indices.presentFamily.value(), 0, &_vulkanDevice->_queues._present);
     }
+
 }
