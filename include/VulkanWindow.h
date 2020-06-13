@@ -5,7 +5,8 @@
 #include <GLFW/glfw3.h>
 #endif
 
-#include <VulkanManager.h>
+#include <vulkan/vulkan.h>
+#include <string>
 
 namespace Skip {
 
