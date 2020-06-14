@@ -1,5 +1,14 @@
 #include <VulkanSwapchain.h>
 
+namespace std {
+    template<> struct hash<Skip::Vertex> {
+        size_t operator()(Skip::Vertex const& vertex) const {
+            return ((hash<glm::vec3>()(vertex.pos) ^
+                (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+                (hash<glm::vec2>()(vertex.texCoord) << 1);
+        }
+    };
+};
 
 namespace Skip {
 
@@ -12,12 +21,46 @@ namespace Skip {
         this->createImageViews();
         this->createRenderPass();
         this->createDescriptorSetLayout();
-        //this->createGraphicsPipeline();
+        this->createGraphicsPipeline();
+        //this->createCommandPool();
 	};
 
 	VulkanSwapchain::~VulkanSwapchain() {
         //this->cleanupSwapChain();
 	};
+
+
+    VkVertexInputBindingDescription Vertex::getBindingDescription() {
+        // manage attribute binding per vertex
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0; // specifies the index of the binding in the array of bindings
+        bindingDescription.stride = sizeof(Vertex); // number of bytes from one entry to next
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        return bindingDescription;
+    }
+
+    std::array<VkVertexInputAttributeDescription, 3> Vertex::getAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+        // we have two attributes: position and color (hence the size)
+        attributeDescriptions[0].binding = 0; // binding the per-vertex data
+        attributeDescriptions[0].location = 0; // location directive of the input in the vertex shader
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT; // type of data (look at reference guide)
+        attributeDescriptions[0].offset = offsetof(Vertex, pos); // specifies the number of bytes since the start of the per-vertex data
+
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+
+        return attributeDescriptions;
+    }
+
 
     // recreateSwapChain is called when we draw frames
     void VulkanSwapchain::recreateSwapChain() {
@@ -36,7 +79,7 @@ namespace Skip {
         this->createSwapChain();
         this->createImageViews();
         this->createRenderPass();
-        //this->createGraphicsPipeline();
+        this->createGraphicsPipeline();
         /*
         createColorResources();
         createDepthResources();
@@ -68,10 +111,10 @@ namespace Skip {
         }
         vkDestroyDescriptorPool(logicalDevice, descriptorPool, nullptr);
         vkFreeCommandBuffers(logicalDevice, commandPool, static_cast<uint32_t>(commandBuffers.size()),
-            commandBuffers.data());
-        vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
-        */
+            commandBuffers.data());*/
+        vkDestroyPipeline(logicalDevice, _graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(logicalDevice, _pipelineLayout, nullptr);
+        
         vkDestroyRenderPass(logicalDevice, _renderPass, nullptr);
         for (size_t i = 0; i < _swapChainImageViews.size(); i++) {
             vkDestroyImageView(logicalDevice, _swapChainImageViews[i], nullptr);
@@ -217,6 +260,8 @@ namespace Skip {
 
     void VulkanSwapchain::createImageViews() {
         //resize list to fit all image views we'll be creating
+        // Builds the following member variables:
+        //     _swapChainImageViews
         _swapChainImageViews.resize(_swapChainImages.size());
         for (size_t i = 0; i < _swapChainImages.size(); i++) {
             _swapChainImageViews[i] = createImageView(_swapChainImages[i], _swapChainImageFormat,
@@ -274,6 +319,8 @@ namespace Skip {
 
 
     void VulkanSwapchain::createRenderPass() {
+        // Builds the following member variables:
+        //     _renderPass
         VkAttachmentDescription colorAttachment{};
         colorAttachment.format = _swapChainImageFormat;
         colorAttachment.samples = _vkDevice->_gpuInfo->msaaSamples;
@@ -361,6 +408,9 @@ namespace Skip {
     }
     
     void VulkanSwapchain::createDescriptorSetLayout() {
+        // Builds the following member variables:
+        //     _descriptorSetLayout
+
         // Every binding needs to be described
         // UBO binding
         VkDescriptorSetLayoutBinding uboLayoutBinding{};
@@ -393,15 +443,22 @@ namespace Skip {
         }
     }
 
-    /*
+    
     void VulkanSwapchain::createGraphicsPipeline() {
         //TODO: refactor to compile inline for .vert and .frag as initial setup?
+        //      Could also pass in file paths to read into this functions
+        //
+        // Builds the following member variables:
+        //     _pipelineLayout 
+        //     _graphicsPipeline
+
         auto vertShaderCode = readFile("shaders/vert.spv");
         auto fragShaderCode = readFile("shaders/frag.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
         VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
 
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
         vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -421,7 +478,6 @@ namespace Skip {
         fragShaderStageInfo.pSpecializationInfo = nullptr;
 
         VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
-
 
         // create vertex input
         auto bindingDescription = Vertex::getBindingDescription();
@@ -446,14 +502,14 @@ namespace Skip {
         VkViewport viewport{};
         viewport.x = 0.0f;
         viewport.y = 0.0f;
-        viewport.width = (float)swapChainExtent.width;
-        viewport.height = (float)swapChainExtent.height;
+        viewport.width = (float)_swapChainExtent.width;
+        viewport.height = (float)_swapChainExtent.height;
         viewport.minDepth = 0.0f; // depth between [0..1]
         viewport.maxDepth = 1.0f;
 
         VkRect2D scissor{};
         scissor.offset = { 0, 0 };
-        scissor.extent = swapChainExtent;
+        scissor.extent = _swapChainExtent;
 
         VkPipelineViewportStateCreateInfo viewportState{};
         viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -465,20 +521,10 @@ namespace Skip {
         //Rasterizer
         VkPipelineRasterizationStateCreateInfo rasterizer{};
         rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-        // fragments that are beyond the near and far planes are clamped. Useful for creating shadow
-        // maps. Require enabling GPU feature
         rasterizer.depthClampEnable = VK_FALSE;
-
-        // Setting discard enable to true means geometry never passes 
-        // through rasterization stage
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
-
-        // polygonMode determines how fragments are generated for geometry
-        // MODE_FILL, MODE_LINE, MODE_POINT
-        // using anything aside fill requires a GPU feature
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 
-        // thickness of line. Thicker than 1.0f requires wideLines GPU feature
         rasterizer.lineWidth = 1.0f;
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -489,12 +535,11 @@ namespace Skip {
 
         // multisampling -- one of the ways to perform anti-aliasing
         // enabling it requires enabling GPU feature
-        // CURRENT: we disable for now
         VkPipelineMultisampleStateCreateInfo multisampling{};
         multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
         multisampling.sampleShadingEnable = VK_FALSE; // can enable if enabled from logical device
         multisampling.minSampleShading = 1.0f; // (0.2f) min fraction for simple shading; closer to one is smoother
-        multisampling.rasterizationSamples = msaaSamples;
+        multisampling.rasterizationSamples = _vkDevice->_gpuInfo->msaaSamples;
         multisampling.pSampleMask = nullptr; // optional
         multisampling.alphaToCoverageEnable = VK_FALSE; // optional
         multisampling.alphaToOneEnable = VK_FALSE; // optional
@@ -558,14 +603,14 @@ namespace Skip {
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1; // setting descriptor layout for binding info
-        pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+        pipelineLayoutInfo.pSetLayouts = &_descriptorSetLayout;
         pipelineLayoutInfo.pushConstantRangeCount = 0; // optional
         pipelineLayoutInfo.pPushConstantRanges = nullptr;
-        if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
-            throw runtime_error("Failed to create pipeline layout!");
+        if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create pipeline layout!");
         }
-
-        // create Graphics Pipeline (Conclusion)
+        
+        // create Graphics Pipeline
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         pipelineInfo.stageCount = 2; // what is this for?
@@ -580,21 +625,21 @@ namespace Skip {
         pipelineInfo.pColorBlendState = &colorBlending;
         pipelineInfo.pDynamicState = nullptr; // optional
 
-        pipelineInfo.layout = pipelineLayout;
-        pipelineInfo.renderPass = renderPass;
+        pipelineInfo.layout = _pipelineLayout;
+        pipelineInfo.renderPass = _renderPass;
         pipelineInfo.subpass = 0;
 
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // optional -- can switch between pipelines, but right now there's only one
         pipelineInfo.basePipelineIndex = -1; // optional
 
         if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1,
-            &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
-            throw runtime_error("Failed to create graphics pipeline!");
+            &pipelineInfo, nullptr, &_graphicsPipeline) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create graphics pipeline!");
         }
 
         vkDestroyShaderModule(logicalDevice, vertShaderModule, nullptr);
         vkDestroyShaderModule(logicalDevice, fragShaderModule, nullptr);
-    }*/
+    }
 
     VkShaderModule VulkanSwapchain::createShaderModule(const std::vector<char>& code) {
         VkShaderModuleCreateInfo createInfo{};
@@ -609,7 +654,7 @@ namespace Skip {
     }
 
 
-    std::vector<char> readFile(const std::string& filename) {
+    static std::vector<char> readFile(const std::string& filename) {
         std::ifstream file(filename, std::ios::ate | std::ios::binary); // reads from the end
         if (!file.is_open()) {
             throw std::runtime_error("Failed to open file!");

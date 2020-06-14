@@ -19,13 +19,27 @@
 #include <VulkanWindow.h>
 
 namespace Skip {
+	
+	//UBO
+	struct UniformBufferObject {
+		alignas(16) glm::mat4 model;
+		alignas(16) glm::mat4 view;
+		alignas(16) glm::mat4 proj;
+	};
 
 	struct Vertex {
 		glm::vec3 pos;
 		glm::vec3 color;
 		glm::vec2 texCoord;
+
+		static VkVertexInputBindingDescription getBindingDescription();
+		static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();
+		bool operator==(const Vertex& other) const {
+			return pos == other.pos && color == other.color && texCoord == other.texCoord;
+		}
 	};
 
+	// hash function for Vertex
 	struct SwapchainDetails {
 		VkSurfaceCapabilitiesKHR capabilities;
 		std::vector<VkSurfaceFormatKHR> formats;
@@ -49,6 +63,8 @@ namespace Skip {
 		std::vector<VkImageView> _swapChainImageViews;
 		VkRenderPass _renderPass;
 		VkDescriptorSetLayout _descriptorSetLayout;
+		VkPipelineLayout _pipelineLayout;
+		VkPipeline _graphicsPipeline;
 
 		SwapchainDetails querySwapchain();
 
@@ -69,10 +85,11 @@ namespace Skip {
 			VkFormatFeatureFlags features);
 
 		void createDescriptorSetLayout();
-
 		void createGraphicsPipeline();
 		VkShaderModule createShaderModule(const std::vector<char>& code);
+
+		void createCommandPool();
 	};
 
-
+	static std::vector<char> readFile(const std::string& filename);
 }
