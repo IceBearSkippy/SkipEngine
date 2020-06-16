@@ -26,9 +26,9 @@ namespace Skip {
 	
 
 	struct Queues {
-		VkQueue _graphics = VK_NULL_HANDLE;
-		VkQueue _present = VK_NULL_HANDLE;
-		VkQueue _transfer = VK_NULL_HANDLE;
+		VkQueue graphics = VK_NULL_HANDLE;
+		VkQueue present = VK_NULL_HANDLE;
+		VkQueue transfer = VK_NULL_HANDLE;
 	};
 
 	class VulkanDevice {
@@ -49,6 +49,7 @@ namespace Skip {
 		VkDevice* getLogicalDevice() {
 			return &_logicalDevice;
 		};
+
 	private:
 
 	};

@@ -65,6 +65,14 @@ namespace Skip {
 		VkDescriptorSetLayout _descriptorSetLayout;
 		VkPipelineLayout _pipelineLayout;
 		VkPipeline _graphicsPipeline;
+		VkCommandPool _commandPool;
+		VkImage _colorImage;
+		VkDeviceMemory _colorImageMemory;
+		VkImageView _colorImageView;
+		VkImage _depthImage;
+		VkDeviceMemory _depthImageMemory;
+		VkImageView _depthImageView;
+		std::vector<VkFramebuffer> _swapChainFramebuffers;
 
 		SwapchainDetails querySwapchain();
 
@@ -89,6 +97,20 @@ namespace Skip {
 		VkShaderModule createShaderModule(const std::vector<char>& code);
 
 		void createCommandPool();
+		VkCommandBuffer beginSingleTimeCommands();
+		void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+
+		void createColorResources();
+		void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format,
+			VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+		uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+		bool hasStencilComponent(VkFormat format);
+
+		void createDepthResources();
+		void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
+			VkImageLayout newLayout, uint32_t mipLevels);
+
+		void createFramebuffers();
 	};
 
 	static std::vector<char> readFile(const std::string& filename);
