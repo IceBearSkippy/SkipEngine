@@ -18,10 +18,18 @@ namespace Skip {
         this->queryPhysicalDevices();
         
         _vulkanDevice = &VulkanDevice::VulkanDevice(this->pickPhysicalDevice());
+        
+        
+        // THIS IS TEMPORARY. Let's get it running first
+        ModelObject modelObject;
+        modelObject.modelPath = "models/viking_room.obj";
+        modelObject.texturePath = "textures/viking_room.png";
+        std::vector<ModelObject> modelObjects;
+        modelObjects.push_back(modelObject);
 
         this->createLogicalDevice();
 
-        _vulkanSwapchain = &VulkanSwapchain::VulkanSwapchain();
+        _vulkanSwapchain = &VulkanSwapchain::VulkanSwapchain(_vulkanDevice, _window, modelObjects);
     };
 
     VulkanManager::~VulkanManager() {
