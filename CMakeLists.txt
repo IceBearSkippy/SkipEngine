@@ -16,6 +16,7 @@ find_package ( PkgConfig )
 find_package( Vulkan REQUIRED )
 find_package( glfw3 REQUIRED )
 find_package( glm REQUIRED )
+find_package( tinyobjloader REQUIRED )
 
 list ( APPEND PROJECT_INCLUDE_DIRECTORIES 
   ${SOURCE_FOLDER}
