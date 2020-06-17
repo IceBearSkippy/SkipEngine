@@ -14,9 +14,10 @@ namespace Skip {
 
     VulkanSwapchain::VulkanSwapchain() {};
 
-	VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow) {
+	VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<ModelObject> modelObjects) {
         _vkDevice = vkDevice;
         _vkWindow = vkWindow;
+        _modelObjects = modelObjects;
         this->createSwapChain();
         this->createImageViews();
         this->createRenderPass();
@@ -29,7 +30,7 @@ namespace Skip {
 	};
 
 	VulkanSwapchain::~VulkanSwapchain() {
-        //this->cleanupSwapChain();
+        this->cleanupSwapChain();
 	};
 
 
@@ -896,12 +897,21 @@ namespace Skip {
         }
     }
 
+    void VulkanSwapchain::createTextureImages() {
+        // There are going to be many texture images to process
+        // In this engine, we'll start with using the ModelObject struct
+        // to load an object and uv texture map
+
+
+
+    }
+
     static std::vector<char> readFile(const std::string& filename) {
         std::ifstream file(filename, std::ios::ate | std::ios::binary); // reads from the end
         if (!file.is_open()) {
             throw std::runtime_error("Failed to open file!");
         }
-        size_t fileSize = (size_t)file.tellg();
+        size_t fileSize = (size_t) file.tellg();
         std::vector<char> buffer(fileSize); // allocates size based on end
         file.seekg(0);
         file.read(buffer.data(), fileSize);

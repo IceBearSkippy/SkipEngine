@@ -6,6 +6,10 @@
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #define GLM_ENABLE_EXPERIMENTAL
 
+#include <tiny_obj_loader.h>
+
+#include <stb/stb_image.h>
+
 #include <glm/gtx/hash.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <glm/glm.hpp>
@@ -39,6 +43,12 @@ namespace Skip {
 		}
 	};
 
+	// this will only support simple uv mapping
+	struct ModelObject {
+		std::string texturePath;
+		std::string modelPath;
+	};
+
 	// hash function for Vertex
 	struct SwapchainDetails {
 		VkSurfaceCapabilitiesKHR capabilities;
@@ -50,7 +60,7 @@ namespace Skip {
 
 	public:
 		VulkanSwapchain();
-		VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow);
+		VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<ModelObject> modelObjects);
 		~VulkanSwapchain();
 
 		VulkanDevice* _vkDevice = nullptr;
@@ -73,7 +83,7 @@ namespace Skip {
 		VkDeviceMemory _depthImageMemory;
 		VkImageView _depthImageView;
 		std::vector<VkFramebuffer> _swapChainFramebuffers;
-
+		std::vector<ModelObject>  _modelObjects;
 		SwapchainDetails querySwapchain();
 
 		void recreateSwapChain();
@@ -111,6 +121,7 @@ namespace Skip {
 			VkImageLayout newLayout, uint32_t mipLevels);
 
 		void createFramebuffers();
+		void createTextureImages();
 	};
 
 	static std::vector<char> readFile(const std::string& filename);
