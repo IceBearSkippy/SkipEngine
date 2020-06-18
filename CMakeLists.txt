@@ -36,6 +36,9 @@ list ( APPEND PROJECT_EXECUTABLE_FILES
 # include files
 include_directories( ${PROJECT_INCLUDE_DIRECTORIES} )
 
+# copy over resources directory
+file(COPY ./resources DESTINATION ${CMAKE_BINARY_DIR})
+
 # target
 add_executable( ${APP_NAME} ${PROJECT_EXECUTABLE_FILES} )
 
