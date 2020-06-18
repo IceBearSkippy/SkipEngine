@@ -47,6 +47,10 @@ namespace Skip {
 	struct ModelObject {
 		std::string texturePath;
 		std::string modelPath;
+		VkImage textureImage;
+		VkDeviceMemory textureImageMemory;
+		VkImageView textureImageView;
+		VkSampler textureSampler;
 	};
 
 	// hash function for Vertex
@@ -122,6 +126,10 @@ namespace Skip {
 
 		void createFramebuffers();
 		void createTextureImages();
+		void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+			VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+		void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+		void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
 	};
 
 	static std::vector<char> readFile(const std::string& filename);
