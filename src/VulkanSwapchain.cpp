@@ -29,6 +29,9 @@ namespace Skip {
         this->createFramebuffers();
         this->createTextureImages();
         this->createTextureImageViews();
+        this->loadModels();
+        this->createVertexBuffers();
+        this->createIndexBuffers();
 	};
 
 	VulkanSwapchain::~VulkanSwapchain() {
@@ -1212,36 +1215,94 @@ namespace Skip {
         }
     }
 
-    void VulkanSwapchain::createVertexBuffer() {
+    void VulkanSwapchain::createVertexBuffers() {
         // TODO: implement vbo solution.. Do we want a buffer for each modelobject? Or one big buffer?
-        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+        // we can try the OpenGL approach here
+        // 
+        // This currently creates buffer and memory buffer in ModelObject
 
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        // TRANSFER_SRC - source of transfer
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            stagingBuffer, stagingBufferMemory);
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        for (ModelObject modelObject : _modelObjects) {
+            VkDeviceSize bufferSize = sizeof(modelObject.vertices[0]) * modelObject.vertices.size();
+
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingBufferMemory;
+            // TRANSFER_SRC - source of transfer
+            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                stagingBuffer, stagingBufferMemory);
 
 
-        // filling the vertex buffer by first passing a staging buffer
-        // could specify special vaule VK_WHOLE_SIZE to map all memory (3rd param)
-        // Caching can be an issue which can be fixed with vkFlushedMappedMemoryRanges
-        // after writing to mapped memory or use a memory heap that is host coherent
-        void* data;
-        vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
-        memcpy(data, vertices.data(), (size_t)bufferSize);
-        vkUnmapMemory(logicalDevice, stagingBufferMemory);
+            // filling the vertex buffer by first passing a staging buffer
+            // could specify special vaule VK_WHOLE_SIZE to map all memory (3rd param)
+            // Caching can be an issue which can be fixed with vkFlushedMappedMemoryRanges
+            // after writing to mapped memory or use a memory heap that is host coherent
+            void* data;
+            vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+            memcpy(data, modelObject.vertices.data(), (size_t)bufferSize);
+            vkUnmapMemory(logicalDevice, stagingBufferMemory);
 
-        // TRANSFER_DST - transfer destination
-        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+            // TRANSFER_DST - transfer destination
+            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, modelObject.vertexBuffer, modelObject.vertexBufferMemory);
 
-        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+            copyBuffer(stagingBuffer, modelObject.vertexBuffer, bufferSize);
 
-        vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
-        vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
+            vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
+            vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
+        }
     }
+
+    void VulkanSwapchain::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
+        // Memory transfer operations use command buffers --> we need a temp command buffer
+        // TODO: You might want to create a separate command pool for these short lived copy/transfers.
+        //       In that case, use VK_COMMAND_POOL_CREATE_TRANSIENT_BIT flag in command pool
+
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+        VkBufferCopy copyRegion{};
+        copyRegion.size = size;
+        vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+        endSingleTimeCommands(commandBuffer);
+    }
+
+    void VulkanSwapchain::createIndexBuffers() {
+        // TODO:
+        // Not all ModelObjects will need to create index buffers, but it is faster for loading
+
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        for (ModelObject modelObject : _modelObjects) {
+            VkDeviceSize bufferSize = sizeof(modelObject.indices[0]) * modelObject.indices.size();
+
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingBufferMemory;
+            // TRANSFER_SRC - source of transfer
+            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                stagingBuffer, stagingBufferMemory);
+
+
+            // filling the vertex buffer by first passing a staging buffer
+            // could specify special vaule VK_WHOLE_SIZE to map all memory (3rd param)
+            // Caching can be an issue which can be fixed with vkFlushedMappedMemoryRanges
+            // after writing to mapped memory or use a memory heap that is host coherent
+            void* data;
+            vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+            memcpy(data, modelObject.indices.data(), (size_t)bufferSize);
+            vkUnmapMemory(logicalDevice, stagingBufferMemory);
+
+            // TRANSFER_DST - transfer destination
+            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, modelObject.indexBuffer, modelObject.indexBufferMemory);
+
+            copyBuffer(stagingBuffer, modelObject.indexBuffer, bufferSize);
+
+            vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
+            vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
+        }
+    }
+
     static std::vector<char> readFile(const std::string& filename) {
         std::ifstream file(filename, std::ios::ate | std::ios::binary); // reads from the end
         if (!file.is_open()) {

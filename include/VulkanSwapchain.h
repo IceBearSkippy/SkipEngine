@@ -52,6 +52,16 @@ namespace Skip {
 		VkImageView textureImageView;
 		VkSampler textureSampler;
 		uint32_t mipLevels;
+
+		std::vector<Vertex> vertices;
+		std::unordered_map<Vertex, uint32_t> uniqueVertices;
+		std::vector<uint32_t> indices;
+
+		VkBuffer vertexBuffer;
+		VkDeviceMemory vertexBufferMemory;
+
+		VkBuffer indexBuffer;
+		VkDeviceMemory indexBufferMemory;
 	};
 
 	// hash function for Vertex
@@ -127,6 +137,7 @@ namespace Skip {
 
 		void createFramebuffers();
 
+		// We are managing multiple textures using ModelObject struct
 		void createTextureImages();
 		void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
 			VkBuffer& buffer, VkDeviceMemory& bufferMemory);
@@ -136,6 +147,11 @@ namespace Skip {
 		void createTextureImageViews();
 		void createTextureSamplers();
 		void loadModels();
+
+		void createVertexBuffers();
+		void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+
+		void createIndexBuffers();
 	};
 
 	static std::vector<char> readFile(const std::string& filename);
