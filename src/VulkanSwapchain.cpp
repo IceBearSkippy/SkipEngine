@@ -27,6 +27,8 @@ namespace Skip {
         this->createColorResources();
         this->createDepthResources();
         this->createFramebuffers();
+        this->createTextureImages();
+        this->createTextureImageViews();
 	};
 
 	VulkanSwapchain::~VulkanSwapchain() {
@@ -914,7 +916,7 @@ namespace Skip {
                 &texHeight, &texChannels, STBI_rgb_alpha);
             VkDeviceSize imageSize = texWidth * texHeight * 4;
 
-            uint32_t mipLevels = static_cast<uint32_t>(floor(log2(std::max(texWidth, texHeight)))) + 1;
+            _modelObjects[i].mipLevels = static_cast<uint32_t>(floor(log2(std::max(texWidth, texHeight)))) + 1;
 
             if (!pixels) {
                 throw std::runtime_error("Failed to load texture image!");
@@ -934,13 +936,13 @@ namespace Skip {
 
             stbi_image_free(pixels);
 
-            createImage(texWidth, texHeight, mipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+            createImage(texWidth, texHeight, _modelObjects[i].mipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _modelObjects[i].textureImage, _modelObjects[i].textureImageMemory);
 
             // image layout to transfer (pipeline barrier)
             transitionImageLayout(_modelObjects[i].textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _modelObjects[i].mipLevels);
             //copy to staging buffer
             copyBufferToImage(stagingBuffer, _modelObjects[i].textureImage,
                 static_cast<uint32_t>(texWidth),
@@ -948,7 +950,7 @@ namespace Skip {
             // prepare image for shader access
             // moved the VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL transitioning to mipmap method
             // TODO: can we make mipmapping optional?
-            generateMipmaps(_modelObjects[i].textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, mipLevels);
+            generateMipmaps(_modelObjects[i].textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, _modelObjects[i].mipLevels);
 
             vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
             vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
@@ -1120,6 +1122,126 @@ namespace Skip {
         endSingleTimeCommands(commandBuffer);
     }
 
+    void VulkanSwapchain::createTextureImageViews() {
+        for (size_t i = 0; i < _modelObjects.size(); i++) {
+            _modelObjects[i].textureImageView = createImageView(_modelObjects[i].textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+                VK_IMAGE_ASPECT_COLOR_BIT, _modelObjects[i].mipLevels);
+        }
+    }
+
+    void VulkanSwapchain::createTextureSamplers() {
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        for (size_t i = 0; i < _modelObjects.size(); i++) {
+            VkSamplerCreateInfo samplerInfo{};
+            samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+            // specify how to interpolate texels -- other option is VK_FILTER_NEAREST
+            samplerInfo.magFilter = VK_FILTER_LINEAR;
+            samplerInfo.minFilter = VK_FILTER_LINEAR;
+            // U, V, W is x, y, z in texture space
+            // can specify repeat or clamp here
+            samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+            //anisotropic filtering
+            samplerInfo.anisotropyEnable = VK_TRUE;
+            samplerInfo.maxAnisotropy = 16;
+            // border color when sampling beyond image (can't specify arbitrary color)
+            samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+            // if true: [0, texWidth) and [0, texHeight)
+            // else: [0, 1) on all axis
+            samplerInfo.unnormalizedCoordinates = VK_FALSE;
+            // mainly used for percentage-closer filtering on shadow maps
+            samplerInfo.compareEnable = VK_FALSE;
+            samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+            // mipmapping settings
+            samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            samplerInfo.mipLodBias = 0.0f;
+            // using the higher mip map levels will result in more blurry (as in for distance)
+            samplerInfo.minLod = 0.0f;
+            samplerInfo.maxLod = static_cast<float>(_modelObjects[i].mipLevels); // Max level of detail
+
+            if (vkCreateSampler(logicalDevice, &samplerInfo, nullptr, &_modelObjects[i].textureSampler) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to create a texture sampler!");
+            }
+        }
+    }
+
+
+    void VulkanSwapchain::loadModels() {
+
+        for (ModelObject modelObject: _modelObjects) {
+            tinyobj::attrib_t attrib;
+            std::vector<tinyobj::shape_t> shapes;
+            std::vector<tinyobj::material_t> materials;
+            std::string warn, err;
+
+            if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, modelObject.modelPath.c_str())) {
+                throw std::runtime_error(warn + err);
+            }
+
+            // attrib container holds pos, norms and tex coords
+            // shapes container has all seperate objects and faces
+            // in our case, we are ignoring material/texture per face
+
+            //combine all faces in the file into a single model
+            for (const auto& shape : shapes) {
+                for (const auto& index : shape.mesh.indices) {
+                    Vertex vertex{};
+
+                    vertex.pos = {
+                        attrib.vertices[3 * index.vertex_index + 0],
+                        attrib.vertices[3 * index.vertex_index + 1],
+                        attrib.vertices[3 * index.vertex_index + 2]
+                    };
+
+                    // obj format assumes coord system where a vertical (y) coordinate of 0 
+                    // means bottom of the image
+                    vertex.texCoord = {
+                        attrib.texcoords[2 * index.texcoord_index + 0],
+                        1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+                    };
+
+                    vertex.color = { 1.0f, 1.0f, 1.0f };
+                    if (modelObject.uniqueVertices.count(vertex) == 0) {
+                        modelObject.uniqueVertices[vertex] = static_cast<uint32_t>(modelObject.vertices.size());
+                        modelObject.vertices.push_back(vertex);
+                    }
+                    modelObject.indices.push_back(modelObject.uniqueVertices[vertex]);
+                }
+            }
+        }
+    }
+
+    void VulkanSwapchain::createVertexBuffer() {
+        // TODO: implement vbo solution.. Do we want a buffer for each modelobject? Or one big buffer?
+        VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
+        // TRANSFER_SRC - source of transfer
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            stagingBuffer, stagingBufferMemory);
+
+
+        // filling the vertex buffer by first passing a staging buffer
+        // could specify special vaule VK_WHOLE_SIZE to map all memory (3rd param)
+        // Caching can be an issue which can be fixed with vkFlushedMappedMemoryRanges
+        // after writing to mapped memory or use a memory heap that is host coherent
+        void* data;
+        vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+        memcpy(data, vertices.data(), (size_t)bufferSize);
+        vkUnmapMemory(logicalDevice, stagingBufferMemory);
+
+        // TRANSFER_DST - transfer destination
+        createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+
+        copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+        vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
+        vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
+    }
     static std::vector<char> readFile(const std::string& filename) {
         std::ifstream file(filename, std::ios::ate | std::ios::binary); // reads from the end
         if (!file.is_open()) {

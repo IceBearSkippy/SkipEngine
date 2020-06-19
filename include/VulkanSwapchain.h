@@ -5,7 +5,7 @@
 // allows us to avoid using alignas
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #define GLM_ENABLE_EXPERIMENTAL
-
+#define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
 #include <stb/stb_image.h>
@@ -51,6 +51,7 @@ namespace Skip {
 		VkDeviceMemory textureImageMemory;
 		VkImageView textureImageView;
 		VkSampler textureSampler;
+		uint32_t mipLevels;
 	};
 
 	// hash function for Vertex
@@ -125,11 +126,16 @@ namespace Skip {
 			VkImageLayout newLayout, uint32_t mipLevels);
 
 		void createFramebuffers();
+
 		void createTextureImages();
 		void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
 			VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 		void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 		void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
+		
+		void createTextureImageViews();
+		void createTextureSamplers();
+		void loadModels();
 	};
 
 	static std::vector<char> readFile(const std::string& filename);
