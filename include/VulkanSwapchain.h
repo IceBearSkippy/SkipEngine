@@ -81,6 +81,7 @@ namespace Skip {
 		VulkanDevice* _vkDevice = nullptr;
 		VulkanWindow* _vkWindow = nullptr;
 
+		void drawFrame();
 		VkSwapchainKHR _swapChain;
 		std::vector<VkImage> _swapChainImages;
 		VkFormat _swapChainImageFormat;
@@ -100,6 +101,24 @@ namespace Skip {
 		std::vector<VkFramebuffer> _swapChainFramebuffers;
 		std::vector<ModelObject>  _modelObjects;
 		SwapchainDetails querySwapchain();
+
+		std::vector<VkBuffer> _uniformBuffers;
+		std::vector<VkDeviceMemory> _uniformBuffersMemory;
+
+		VkDescriptorPool _descriptorPool;
+		std::vector<VkDescriptorSet> _descriptorSets;
+		std::vector<VkCommandBuffer> _commandBuffers;
+
+		//semaphores
+		std::vector<VkSemaphore> _imageAvailableSemaphores;
+		std::vector<VkSemaphore> _renderFinishedSemaphores;
+		std::vector<VkFence> _inFlightFences;
+		std::vector<VkFence> _imagesInFlight;
+		size_t _currentFrame = 0;
+
+		//defines how many frames to be processed concurrently
+		//note: each frame should have its own set of semaphores
+		const int MAX_FRAMES_IN_FLIGHT = 2;
 
 		void recreateSwapChain();
 		void cleanupSwapChain();
@@ -150,8 +169,13 @@ namespace Skip {
 
 		void createVertexBuffers();
 		void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-
 		void createIndexBuffers();
+
+		void createUniformBuffers();
+		void createDescriptorPool();
+		void createDescriptorSets();
+		void createCommandBuffers();
+		void createSyncObjects();
 	};
 
 	static std::vector<char> readFile(const std::string& filename);

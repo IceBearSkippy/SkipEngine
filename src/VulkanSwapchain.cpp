@@ -32,6 +32,10 @@ namespace Skip {
         this->loadModels();
         this->createVertexBuffers();
         this->createIndexBuffers();
+        this->createUniformBuffers();
+        this->createDescriptorPool();
+        this->createDescriptorSets();
+        this->createCommandBuffers();
 	};
 
 	VulkanSwapchain::~VulkanSwapchain() {
@@ -92,9 +96,9 @@ namespace Skip {
         this->createColorResources();
         this->createDepthResources();
         this->createFramebuffers();
-        //createUniformBuffers();
-        //createDescriptorPool();
-        //createDescriptorSets();
+        this->createUniformBuffers();
+        this->createDescriptorPool();
+        this->createDescriptorSets();
         //createCommandBuffers();
         
     }
@@ -1222,11 +1226,11 @@ namespace Skip {
         // This currently creates buffer and memory buffer in ModelObject
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
         for (ModelObject modelObject : _modelObjects) {
             VkDeviceSize bufferSize = sizeof(modelObject.vertices[0]) * modelObject.vertices.size();
 
-            VkBuffer stagingBuffer;
-            VkDeviceMemory stagingBufferMemory;
             // TRANSFER_SRC - source of transfer
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -1272,16 +1276,15 @@ namespace Skip {
         // Not all ModelObjects will need to create index buffers, but it is faster for loading
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingBufferMemory;
         for (ModelObject modelObject : _modelObjects) {
             VkDeviceSize bufferSize = sizeof(modelObject.indices[0]) * modelObject.indices.size();
-
-            VkBuffer stagingBuffer;
-            VkDeviceMemory stagingBufferMemory;
+            
             // TRANSFER_SRC - source of transfer
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 stagingBuffer, stagingBufferMemory);
-
 
             // filling the vertex buffer by first passing a staging buffer
             // could specify special vaule VK_WHOLE_SIZE to map all memory (3rd param)
@@ -1301,6 +1304,235 @@ namespace Skip {
             vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
             vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
         }
+    }
+
+    void VulkanSwapchain::createUniformBuffers() {
+        // Is a uniform buffer needed for each model object?
+        VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+        _uniformBuffers.resize(_swapChainImages.size());
+        _uniformBuffersMemory.resize(_swapChainImages.size());
+
+        for (size_t i = 0; i < _swapChainImages.size(); i++) {
+            createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, _uniformBuffers[i],
+                _uniformBuffersMemory[i]);
+        }
+
+    }
+
+    void VulkanSwapchain::createDescriptorPool() {
+        // describe descriptor types our sets are going to contain
+        // Create pools for ubo and sampler
+        std::array<VkDescriptorPoolSize, 2> poolSizes{};
+
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[0].descriptorCount = static_cast<uint32_t>(_swapChainImages.size());
+
+        poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[1].descriptorCount = static_cast<uint32_t>(_swapChainImages.size());
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = static_cast<uint32_t>(_swapChainImages.size());
+        // structure has optional flag to determine individual descriptor sets
+        // can be freed or not: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
+        poolInfo.flags = 0;
+
+        if (vkCreateDescriptorPool(*_vkDevice->getLogicalDevice(), &poolInfo, nullptr, &_descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create descriptor pool!");
+        }
+    }
+
+    void VulkanSwapchain::createDescriptorSets() {
+        // We'll create descriptor set for each swap chain image
+        
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        std::vector<VkDescriptorSetLayout> layouts(_swapChainImages.size(), _descriptorSetLayout);
+
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = _descriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(_swapChainImages.size());
+        allocInfo.pSetLayouts = layouts.data();
+
+        _descriptorSets.resize(_swapChainImages.size());
+        if (vkAllocateDescriptorSets(logicalDevice, &allocInfo, _descriptorSets.data()) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocated descriptor sets!");
+        }
+
+        // descriptor sets need to be configured
+        for (size_t i = 0; i < _swapChainImages.size(); i++) {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = _uniformBuffers[i];
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(UniformBufferObject);
+
+            // This is dependent on Models Loaded
+            std::vector<VkDescriptorImageInfo> imageInfos;
+            imageInfos.resize(_modelObjects.size());
+            for (size_t j = 0; j < _swapChainImages.size(); j++) {
+                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfos[j].imageView = _modelObjects[i].textureImageView;
+                imageInfos[j].sampler = _modelObjects[i].textureSampler;
+            }
+
+            std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+            descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[0].dstSet = _descriptorSets[i];
+            descriptorWrites[0].dstBinding = 0;
+            descriptorWrites[0].dstArrayElement = 0; // not using array
+            descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            descriptorWrites[0].descriptorCount = 1;
+            descriptorWrites[0].pBufferInfo = &bufferInfo;
+            descriptorWrites[0].pImageInfo = nullptr; // Optional -- refer to image data
+            descriptorWrites[0].pTexelBufferView = nullptr; // Optional -- refer to buffer views
+
+            descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[1].dstSet = _descriptorSets[i];
+            descriptorWrites[1].dstBinding = 1;
+            descriptorWrites[1].dstArrayElement = 0; // not using array
+            descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[1].pBufferInfo = nullptr;
+            descriptorWrites[1].descriptorCount = imageInfos.size();
+            descriptorWrites[1].pImageInfo = imageInfos.data();
+            descriptorWrites[1].pTexelBufferView = nullptr;
+
+            vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+        }
+    }
+
+    void VulkanSwapchain::createCommandBuffers() {
+        _commandBuffers.resize(_swapChainFramebuffers.size());
+
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = _commandPool;
+        // levels can be primary or secondary
+        // primary - can be submitted to a queue for execution, but not called by other command buffers
+        // secondary - cannot be submitted directly, but can be called from primary command buffers 
+        //             (useful for common operations from primary command buffers)
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = (uint32_t)_commandBuffers.size();
+
+        if (vkAllocateCommandBuffers(*_vkDevice->getLogicalDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate command buffers!");
+        }
+
+        // Command Buffer Recording
+        for (size_t i = 0; i < _commandBuffers.size(); i++) {
+            VkCommandBufferBeginInfo beginInfo{};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            //flags specify how we're gonna use the command buffer
+            // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT - Command buffer will be rerecorded after executing once
+            // VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT - this is a secondary command buffer
+            //                                                    that will be entirely within a single render pass
+            // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT - Command buffer can be resubmitted while it
+            //                                                is also already pending execution
+            beginInfo.flags = 0; // optional
+
+            // pInheritenceInfo only relevant for secondary command buffers
+            // specifies which state to inherit from the calling primary command buffer
+            beginInfo.pInheritanceInfo = nullptr; // optional
+
+            if (vkBeginCommandBuffer(_commandBuffers[i], &beginInfo) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to begin recording command buffer!");
+            }
+
+            // define clear values for VK_ATTACHMENT_LOAD_OP_CLEAR
+            // we use black with 100% opacity
+            std::array<VkClearValue, 2> clearValues{}; // order should be identical to attachments
+            clearValues[0] = { 0.0f, 0.0f, 0.0f, 1.0f };
+            clearValues[1].depthStencil = { 1.0f, 0 };
+
+            // Render Pass
+            VkRenderPassBeginInfo renderPassInfo{};
+            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            renderPassInfo.renderPass = _renderPass;
+            renderPassInfo.framebuffer = _swapChainFramebuffers[i];
+
+            // size of render area. Where shader loads and stores will take place
+            // should match the size of attachments for best performance
+            renderPassInfo.renderArea.offset = { 0, 0 };
+            renderPassInfo.renderArea.extent = _swapChainExtent;
+
+            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+            renderPassInfo.pClearValues = clearValues.data();
+
+            // final parameter controls how the drawing commands within the render
+            // pass will be provided:
+            // VK_SUBPASS_CONTENTS_INLINE: render pass commands will be embedded in primary cmd
+            //                             buffer and no secondary cmd buffers will be executed
+            // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: render pass cmds will be executed
+            //                                                from secondary command buffers
+            vkCmdBeginRenderPass(_commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+            //Basic Drawing Commands
+            vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
+
+            //draw the triangle -- uses hardcoded vertices
+            // cmdbuffer, vertexCount, instanceCount, firstVertex, firstInstance
+            //vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+            
+            //VkBuffer vertexBuffers[] = { vertexBuffer };
+            // TODO: try loading two different models at once
+            //       and check vertex/index buffer management
+            std::vector<VkBuffer> vertexBuffers;
+            std::vector<VkBuffer> indexBuffers;
+            uint32_t indicesSize;
+            for ( ModelObject modelObject: _modelObjects ) {
+                vertexBuffers.push_back(modelObject.vertexBuffer);
+                indexBuffers.push_back(modelObject.indexBuffer);
+                indicesSize += modelObject.indices.size();
+            }
+
+            VkDeviceSize offsets[] = {  0 };
+            vkCmdBindVertexBuffers(_commandBuffers[i], 0, 1, vertexBuffers.data(), offsets);
+
+            vkCmdBindIndexBuffer(_commandBuffers[i], *indexBuffers.data(), 0, VK_INDEX_TYPE_UINT32);
+
+            //Bind descriptor sets
+            vkCmdBindDescriptorSets(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1,
+                &_descriptorSets[i], 0, nullptr);
+
+            //vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+            // 1 number of instance, offset into index buffer, offset to add to indices in the buffer, offset for instancing
+            vkCmdDrawIndexed(_commandBuffers[i], indicesSize, 1, 0, 0, 0);
+
+            vkCmdEndRenderPass(_commandBuffers[i]);
+            if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to record command buffer!");
+            }
+        }
+    }
+
+    void VulkanSwapchain::createSyncObjects() {
+        _imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        _renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        _inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        _imagesInFlight.resize(_swapChainImages.size(), VK_NULL_HANDLE);
+
+        VkSemaphoreCreateInfo semaphoreInfo{};
+        semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            if (vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr,
+                &_imageAvailableSemaphores[i]) != VK_SUCCESS ||
+                vkCreateSemaphore(logicalDevice, &semaphoreInfo, nullptr,
+                    &_renderFinishedSemaphores[i]) != VK_SUCCESS ||
+                vkCreateFence(logicalDevice, &fenceInfo, nullptr,
+                    &_inFlightFences[i]) != VK_SUCCESS) {
+
+                throw std::runtime_error("Failed to create synchronization objects for a frame!");
+            }
+        }
+
     }
 
     static std::vector<char> readFile(const std::string& filename) {
