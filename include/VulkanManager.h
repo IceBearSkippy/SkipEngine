@@ -3,13 +3,11 @@
 #include <vulkan/vulkan.h>
 
 #include <string>
-
 #include <vector>
 #include <iostream>
 #include <algorithm>
 #include <set>
 
-#include <VulkanDevice.h>
 #include <VulkanSwapchain.h>
 
 const std::string ENGINE_NAME = "SkipEngine";
@@ -39,6 +37,8 @@ namespace Skip {
 
 		void init();
 		bool checkValidationLayerSupport();
+
+		void drawFrame();
 
 		VulkanWindow* _window;
 		bool _enableValidationLayers;

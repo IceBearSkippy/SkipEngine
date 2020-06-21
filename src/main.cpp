@@ -1,5 +1,4 @@
 ﻿#include <VulkanManager.h>
-#include <VulkanWindow.h>
 
 using namespace std;
 
@@ -15,10 +14,8 @@ int main()
 	window = new Skip::VulkanWindow();
 	window->init();
 
-
-	// create VulkanManager
 	vulkanManager = new Skip::VulkanManager(window);
-	
+
 	//setup validation layers
 	#ifndef NODEBUG
 		vulkanManager->_enableValidationLayers = true;
@@ -29,8 +26,8 @@ int main()
 
 	vulkanManager->init();
 	while (!window->shouldClose()) {
-		//glfwPollEvents();
-		//drawFrame()
+		glfwPollEvents();
+		vulkanManager->drawFrame();
 	}
 
 	vulkanManager->~VulkanManager();

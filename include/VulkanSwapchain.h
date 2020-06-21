@@ -1,36 +1,25 @@
 #pragma once
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-
-// allows us to avoid using alignas
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #define GLM_ENABLE_EXPERIMENTAL
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
-#include <stb/stb_image.h>
-
 #include <glm/gtx/hash.hpp>
 #include <glm/gtx/string_cast.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+
+
 #include <vulkan/vulkan.h>
-#include <vector>
 #include <array>
 #include <fstream>
+#include <chrono>
+#include <unordered_map>
 
 #include <VulkanDevice.h>
 #include <VulkanWindow.h>
 
 namespace Skip {
-	
-	//UBO
-	struct UniformBufferObject {
-		alignas(16) glm::mat4 model;
-		alignas(16) glm::mat4 view;
-		alignas(16) glm::mat4 proj;
-	};
-
 	struct Vertex {
 		glm::vec3 pos;
 		glm::vec3 color;
@@ -43,6 +32,33 @@ namespace Skip {
 		}
 	};
 
+	//UBO
+	struct UniformBufferObject {
+		alignas(16) glm::mat4 model;
+		alignas(16) glm::mat4 view;
+		alignas(16) glm::mat4 proj;
+	};
+
+	struct SwapchainDetails {
+		VkSurfaceCapabilitiesKHR capabilities;
+		std::vector<VkSurfaceFormatKHR> formats;
+		std::vector<VkPresentModeKHR> presentModes;
+	};
+}
+
+namespace std {
+	template<> struct hash<Skip::Vertex> {
+		size_t operator()(Skip::Vertex const& vertex) const {
+			return ((hash<glm::vec3>()(vertex.pos) ^
+				(hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+				(hash<glm::vec2>()(vertex.texCoord) << 1);
+		}
+	};
+}
+
+
+namespace Skip {
+	
 	// this will only support simple uv mapping
 	struct ModelObject {
 		std::string texturePath;
@@ -64,13 +80,6 @@ namespace Skip {
 		VkDeviceMemory indexBufferMemory;
 	};
 
-	// hash function for Vertex
-	struct SwapchainDetails {
-		VkSurfaceCapabilitiesKHR capabilities;
-		std::vector<VkSurfaceFormatKHR> formats;
-		std::vector<VkPresentModeKHR> presentModes;
-	};
-
 	class VulkanSwapchain {
 
 	public:
@@ -82,6 +91,9 @@ namespace Skip {
 		VulkanWindow* _vkWindow = nullptr;
 
 		void drawFrame();
+		// updateUniformBuffer can be more front facing..
+		void updateUniformBuffer(uint32_t currentImage);
+
 		VkSwapchainKHR _swapChain;
 		std::vector<VkImage> _swapChainImages;
 		VkFormat _swapChainImageFormat;
@@ -119,6 +131,9 @@ namespace Skip {
 		//defines how many frames to be processed concurrently
 		//note: each frame should have its own set of semaphores
 		const int MAX_FRAMES_IN_FLIGHT = 2;
+
+		//handle resizing
+		bool _framebufferResized = false;
 
 		void recreateSwapChain();
 		void cleanupSwapChain();

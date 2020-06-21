@@ -1,5 +1,4 @@
 #include <VulkanManager.h>
-#include <VulkanWindow.h>
 
 namespace Skip {
 
@@ -22,8 +21,8 @@ namespace Skip {
         
         // THIS IS TEMPORARY. Let's get it running first
         ModelObject modelObject;
-        modelObject.modelPath = "models/viking_room.obj";
-        modelObject.texturePath = "textures/viking_room.png";
+        modelObject.modelPath = "resources/models/viking_room.obj";
+        modelObject.texturePath = "resources/textures/viking_room.png";
         std::vector<ModelObject> modelObjects;
         modelObjects.push_back(modelObject);
 
@@ -45,6 +44,10 @@ namespace Skip {
         }
         _window->~VulkanWindow();
 	};
+
+    void VulkanManager::drawFrame() {
+        _vulkanSwapchain->drawFrame();
+    }
 
     bool VulkanManager::checkValidationLayerSupport() {
         uint32_t layerCount;

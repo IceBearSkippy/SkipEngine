@@ -1,15 +1,10 @@
 #include <VulkanSwapchain.h>
 
-namespace std {
-    template<> struct hash<Skip::Vertex> {
-        size_t operator()(Skip::Vertex const& vertex) const {
-            return ((hash<glm::vec3>()(vertex.pos) ^
-                (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
-                (hash<glm::vec2>()(vertex.texCoord) << 1);
-        }
-    };
-};
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
 namespace Skip {
 
     VulkanSwapchain::VulkanSwapchain() {};
@@ -42,6 +37,108 @@ namespace Skip {
         this->cleanupSwapChain();
 	};
 
+    void VulkanSwapchain::drawFrame() {
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        //wait for the frame to be finished
+        vkWaitForFences(logicalDevice, 1, &_inFlightFences[_currentFrame], VK_TRUE, UINT64_MAX);
+
+        //Aquire image from swap chain
+        uint32_t imageIndex;
+        // imageAvailableSemaphore is to be signaled when presentation engine is
+        // finished using engine (VK_NULL_HANDLE could be fence)
+        vkAcquireNextImageKHR(logicalDevice, _swapChain, UINT64_MAX,
+            _imageAvailableSemaphores[_currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+        // Check if a previous frame is using this image (ie theres a fence to wait on)
+        if (_imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
+            vkWaitForFences(logicalDevice, 1, &_imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+        }
+        // Mark the image as now being in use by this frame
+        _imagesInFlight[imageIndex] = _inFlightFences[_currentFrame];
+
+        updateUniformBuffer(imageIndex);
+
+        //Submitting the command buffer
+        VkSubmitInfo submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        //specify which semaphores to wait on and in which stage
+        // we want to wait with writing colors to the image until it's available,
+        // so we specify the stage of graphics pipeline that writes to color attachment
+        VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[_currentFrame] };
+        VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+        submitInfo.waitSemaphoreCount = 1;
+        submitInfo.pWaitSemaphores = waitSemaphores;
+        submitInfo.pWaitDstStageMask = waitStages;
+
+        //specify which command buffers to actually submit for execution
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &_commandBuffers[imageIndex];
+
+        // specify which semaphore (renderFinishedSemaphore) to signal
+        // once the command buffer has finished executing 
+        VkSemaphore signalSemaphores[] = { _renderFinishedSemaphores[_currentFrame] };
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = signalSemaphores;
+
+        // reset fence before using it
+        vkResetFences(logicalDevice, 1, &_inFlightFences[_currentFrame]);
+        if (vkQueueSubmit(_vkDevice->_queues.graphics, 1, &submitInfo, _inFlightFences[_currentFrame]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to submit draw command buffer!");
+        }
+
+        // Presentation
+        VkPresentInfoKHR presentInfo{};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+        // specify which semaphores to wait on before presentation can happen
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = signalSemaphores;
+
+        // specify swap chains to present images to and the index
+        // of the image for each swap chain. This will always be 1
+        VkSwapchainKHR swapChains[] = { _swapChain };
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = swapChains;
+        presentInfo.pImageIndices = &imageIndex;
+
+        // Specify an array of VkResult values to check for every
+        // individual swap chain.
+        presentInfo.pResults = nullptr; //optional
+
+        VkResult result = vkQueuePresentKHR(_vkDevice->_queues.present, &presentInfo);
+
+        // gives condition if presentation queue is optimal/suboptimal
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            _framebufferResized = false;
+            recreateSwapChain();
+        } else if (result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to present swap chain image!");
+        }
+
+        _currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    }
+
+    void VulkanSwapchain::updateUniformBuffer(uint32_t currentImage) {
+        // Generate a new tranformation every frame (spin it around)
+        static auto startTime = std::chrono::high_resolution_clock::now();
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        UniformBufferObject ubo{};
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.proj = glm::perspective(glm::radians(45.0f), _swapChainExtent.width / (float)_swapChainExtent.height, 0.1f, 10.0f);
+
+        // Flip the signs. Keep this to allow for inverted y coordinate system
+        ubo.proj[1][1] *= -1;
+
+        void* data;
+        vkMapMemory(*_vkDevice->getLogicalDevice(), _uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
+        memcpy(data, &ubo, sizeof(ubo));
+        vkUnmapMemory(*_vkDevice->getLogicalDevice(), _uniformBuffersMemory[currentImage]);
+
+    }
 
     VkVertexInputBindingDescription Vertex::getBindingDescription() {
         // manage attribute binding per vertex
@@ -99,7 +196,7 @@ namespace Skip {
         this->createUniformBuffers();
         this->createDescriptorPool();
         this->createDescriptorSets();
-        //createCommandBuffers();
+        this->createCommandBuffers();
         
     }
 
