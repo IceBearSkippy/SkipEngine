@@ -20,9 +20,9 @@ find_package( tinyobjloader REQUIRED )
 
 list ( APPEND PROJECT_INCLUDE_DIRECTORIES 
   ${SOURCE_FOLDER}
-  ${INCLUDE_FOLDER}
   ${LIBS_FOLDER}
   ${VULKAN_SDK}/Include
+  ${INCLUDE_FOLDER}
 )
 
 list ( APPEND PROJECT_EXECUTABLE_FILES
@@ -47,6 +47,7 @@ find_library( VULKAN_SDK
   PATHS ${VULKAN_SDK}/Lib
 )
 
+target_link_libraries( ${APP_NAME} tinyobjloader::tinyobjloader )
 target_link_libraries( ${APP_NAME} glfw )
 target_link_libraries( ${APP_NAME} glm )
 target_link_libraries( ${APP_NAME} ${VULKAN_SDK}/Lib/vulkan-1.lib )
