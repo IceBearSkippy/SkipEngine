@@ -29,7 +29,6 @@ int main()
 		glfwPollEvents();
 		vulkanManager->drawFrame();
 	}
-
 	vulkanManager->~VulkanManager();
 	return 0;
 }

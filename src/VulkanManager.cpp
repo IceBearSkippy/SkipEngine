@@ -8,7 +8,7 @@ namespace Skip {
         _window = window;
         _enableValidationLayers = false;
         _instance = VK_NULL_HANDLE;
-	};
+	}
     void VulkanManager::init() {
         // create vulkan instance and surface
         this->createInstance();
@@ -16,8 +16,7 @@ namespace Skip {
         this->createSurface();
         this->queryPhysicalDevices();
         
-        _vulkanDevice = &VulkanDevice::VulkanDevice(this->pickPhysicalDevice());
-        
+        _vulkanDevice = new VulkanDevice(this->pickPhysicalDevice());
         
         // THIS IS TEMPORARY. Let's get it running first
         ModelObject modelObject;
@@ -28,22 +27,25 @@ namespace Skip {
 
         this->createLogicalDevice();
 
-        _vulkanSwapchain = &VulkanSwapchain::VulkanSwapchain(_vulkanDevice, _window, modelObjects);
-    };
+        _vulkanSwapchain = new VulkanSwapchain(_vulkanDevice, _window, modelObjects);
+    }
 
     VulkanManager::~VulkanManager() {
         
         if (_enableValidationLayers) {
             destroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
         }
+        _vulkanSwapchain->~VulkanSwapchain();
         if (_window->_surface != VK_NULL_HANDLE) {
             vkDestroySurfaceKHR(_instance, _window->_surface, nullptr);;
         }
+
+        _window->~VulkanWindow();
         if (_instance != VK_NULL_HANDLE) {
             vkDestroyInstance(_instance, nullptr);
         }
-        _window->~VulkanWindow();
-	};
+        
+	}
 
     void VulkanManager::drawFrame() {
         _vulkanSwapchain->drawFrame();
