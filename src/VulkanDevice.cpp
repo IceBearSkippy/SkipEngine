@@ -5,11 +5,11 @@ namespace Skip {
 	VulkanDevice::VulkanDevice() { };
 	VulkanDevice::VulkanDevice(GPUInfo* gpu) {
 		_gpuInfo = gpu;
-	};
+	}
 
 	VulkanDevice::~VulkanDevice() {
 
-	};
+	}
 
 
 	QueueFamilyIndices QueueFamilyIndices::findQueueFamilies(GPUInfo* gpuInfo, VkSurfaceKHR& surface) {
