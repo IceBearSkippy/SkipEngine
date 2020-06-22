@@ -1,46 +1,14 @@
 #include <VulkanManager.h>
-#include <VulkanWindow.h>
 
 namespace Skip {
 
-    bool QueueFamilyIndices::isComplete() {
-        return graphicsFamily.has_value() &&
-            presentFamily.has_value();
-    }
-
-    QueueFamilyIndices findQueueFamilies(GPUInfo gpuInfo, VkSurfaceKHR& surface) {
-
-        VkPhysicalDevice device = gpuInfo.device;
-        QueueFamilyIndices indices;
-        uint32_t queueFamilyCount = 0;
-
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-
-        int i = 0;
-        for (const auto& queueFamily : queueFamilies) {
-            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                indices.graphicsFamily = i;
-            }
-            VkBool32 presentSupport = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
-            if (presentSupport) {
-                indices.presentFamily = i;
-            }
-            if (indices.isComplete()) {
-                break;
-            }
-            i++;
-        }
-        return indices;
-    }
+    
 
 	VulkanManager::VulkanManager(VulkanWindow* window) {
         _window = window;
         _enableValidationLayers = false;
         _instance = VK_NULL_HANDLE;
-	};
+	}
     void VulkanManager::init() {
         // create vulkan instance and surface
         this->createInstance();
@@ -48,25 +16,40 @@ namespace Skip {
         this->createSurface();
         this->queryPhysicalDevices();
         
-        _vulkanDevice = &VulkanDevice::VulkanDevice(this->pickPhysicalDevice());
+        _vulkanDevice = new VulkanDevice(this->pickPhysicalDevice());
+        
+        // THIS IS TEMPORARY. Let's get it running first
+        ModelObject modelObject;
+        modelObject.modelPath = "resources/models/viking_room.obj";
+        modelObject.texturePath = "resources/textures/viking_room.png";
+        std::vector<ModelObject> modelObjects;
+        modelObjects.push_back(modelObject);
 
         this->createLogicalDevice();
-        
-    };
+
+        _vulkanSwapchain = new VulkanSwapchain(_vulkanDevice, _window, modelObjects);
+    }
 
     VulkanManager::~VulkanManager() {
         
         if (_enableValidationLayers) {
             destroyDebugUtilsMessengerEXT(_instance, _debugMessenger, nullptr);
         }
+        _vulkanSwapchain->~VulkanSwapchain();
         if (_window->_surface != VK_NULL_HANDLE) {
             vkDestroySurfaceKHR(_instance, _window->_surface, nullptr);;
         }
+
+        _window->~VulkanWindow();
         if (_instance != VK_NULL_HANDLE) {
             vkDestroyInstance(_instance, nullptr);
         }
-        _window->~VulkanWindow();
-	};
+        
+	}
+
+    void VulkanManager::drawFrame() {
+        _vulkanSwapchain->drawFrame();
+    }
 
     bool VulkanManager::checkValidationLayerSupport() {
         uint32_t layerCount;
@@ -290,7 +273,7 @@ namespace Skip {
     
 
     void VulkanManager::createLogicalDevice() {
-        QueueFamilyIndices indices = findQueueFamilies(*_vulkanDevice->_gpuInfo, _window->_surface);
+        QueueFamilyIndices indices = QueueFamilyIndices::findQueueFamilies(_vulkanDevice->_gpuInfo, _window->_surface);
 
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 
@@ -336,7 +319,8 @@ namespace Skip {
         if (vkCreateDevice(_vulkanDevice->getPhysicalDevice(), &createInfo, nullptr, &_vulkanDevice->_logicalDevice) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create logical device");
         }
-        vkGetDeviceQueue(_vulkanDevice->getLogicalDevice(), indices.presentFamily.value(), 0, &_vulkanDevice->_queues._graphics);
-        vkGetDeviceQueue(_vulkanDevice->getLogicalDevice(), indices.presentFamily.value(), 0, &_vulkanDevice->_queues._present);
+        vkGetDeviceQueue(_vulkanDevice->_logicalDevice, indices.presentFamily.value(), 0, &_vulkanDevice->_queues.graphics);
+        vkGetDeviceQueue(_vulkanDevice->_logicalDevice, indices.presentFamily.value(), 0, &_vulkanDevice->_queues.present);
     }
+
 }

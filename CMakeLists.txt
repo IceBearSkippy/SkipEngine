@@ -15,23 +15,29 @@ set ( VULKAN_SDK C:/VulkanSDK/1.2.135.0 )
 find_package ( PkgConfig )
 find_package( Vulkan REQUIRED )
 find_package( glfw3 REQUIRED )
+find_package( glm REQUIRED )
+find_package( tinyobjloader REQUIRED )
 
 list ( APPEND PROJECT_INCLUDE_DIRECTORIES 
   ${SOURCE_FOLDER}
-  ${INCLUDE_FOLDER}
   ${LIBS_FOLDER}
   ${VULKAN_SDK}/Include
+  ${INCLUDE_FOLDER}
 )
 
 list ( APPEND PROJECT_EXECUTABLE_FILES
   ${SOURCE_FOLDER}/VulkanWindow.cpp
-  ${SOURCE_FOLDER}/VulkanManager.cpp
   ${SOURCE_FOLDER}/VulkanDevice.cpp
+  ${SOURCE_FOLDER}/VulkanSwapchain.cpp
+  ${SOURCE_FOLDER}/VulkanManager.cpp
   ${SOURCE_FOLDER}/main.cpp
 )
 
 # include files
 include_directories( ${PROJECT_INCLUDE_DIRECTORIES} )
+
+# copy over resources directory
+file(COPY ./resources DESTINATION ${CMAKE_BINARY_DIR})
 
 # target
 add_executable( ${APP_NAME} ${PROJECT_EXECUTABLE_FILES} )
@@ -41,6 +47,7 @@ find_library( VULKAN_SDK
   PATHS ${VULKAN_SDK}/Lib
 )
 
+target_link_libraries( ${APP_NAME} tinyobjloader::tinyobjloader )
 target_link_libraries( ${APP_NAME} glfw )
-
+target_link_libraries( ${APP_NAME} glm )
 target_link_libraries( ${APP_NAME} ${VULKAN_SDK}/Lib/vulkan-1.lib )
