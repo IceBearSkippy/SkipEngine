@@ -13,6 +13,7 @@ namespace Skip {
         _vkDevice = vkDevice;
         _vkWindow = vkWindow;
         _modelObjects = modelObjects;
+        _currentFrame = 0;
         this->createSwapChain();
         this->createImageViews();
         this->createRenderPass();
@@ -24,6 +25,7 @@ namespace Skip {
         this->createFramebuffers();
         this->createTextureImages();
         this->createTextureImageViews();
+        this->createTextureSamplers();
         this->loadModels();
         this->createVertexBuffers();
         this->createIndexBuffers();
@@ -31,10 +33,40 @@ namespace Skip {
         this->createDescriptorPool();
         this->createDescriptorSets();
         this->createCommandBuffers();
+        this->createSyncObjects();
 	};
 
 	VulkanSwapchain::~VulkanSwapchain() {
+
+        vkDeviceWaitIdle(*_vkDevice->getLogicalDevice());
+
         this->cleanupSwapChain();
+
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        for (size_t i = 0; i < _modelObjects.size(); i++) {
+            vkDestroySampler(logicalDevice, _modelObjects[i].textureSampler, nullptr);
+            vkDestroyImageView(logicalDevice, _modelObjects[i].textureImageView, nullptr);
+
+            vkDestroyImage(logicalDevice, _modelObjects[i].textureImage, nullptr);
+            vkFreeMemory(logicalDevice, _modelObjects[i].textureImageMemory, nullptr);
+
+            vkDestroyBuffer(logicalDevice, _modelObjects[i].indexBuffer, nullptr);
+            vkFreeMemory(logicalDevice, _modelObjects[i].indexBufferMemory, nullptr);
+
+            vkDestroyBuffer(logicalDevice, _modelObjects[i].vertexBuffer, nullptr);
+            vkFreeMemory(logicalDevice, _modelObjects[i].vertexBufferMemory, nullptr);
+        }
+
+        vkDestroyDescriptorSetLayout(logicalDevice, _descriptorSetLayout, nullptr);
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroySemaphore(logicalDevice, _renderFinishedSemaphores[i], nullptr);
+            vkDestroySemaphore(logicalDevice, _imageAvailableSemaphores[i], nullptr);
+            vkDestroyFence(logicalDevice, _inFlightFences[i], nullptr);
+        }
+        
+        vkDestroyCommandPool(logicalDevice, _commandPool, nullptr);
+        vkDestroyDevice(logicalDevice, nullptr);
 	};
 
     void VulkanSwapchain::drawFrame() {
@@ -214,13 +246,13 @@ namespace Skip {
         for (size_t i = 0; i < _swapChainFramebuffers.size(); i++) {
             vkDestroyFramebuffer(logicalDevice, _swapChainFramebuffers[i], nullptr);
         }
-        /*for (size_t i = 0; i < _swapChainImages.size(); i++) {
+        for (size_t i = 0; i < _swapChainImages.size(); i++) {
             vkDestroyBuffer(logicalDevice, _uniformBuffers[i], nullptr);
             vkFreeMemory(logicalDevice, _uniformBuffersMemory[i], nullptr);
         }
         vkDestroyDescriptorPool(logicalDevice, _descriptorPool, nullptr);
         vkFreeCommandBuffers(logicalDevice, _commandPool, static_cast<uint32_t>(_commandBuffers.size()),
-            _commandBuffers.data());*/
+            _commandBuffers.data());
         vkDestroyPipeline(logicalDevice, _graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(logicalDevice, _pipelineLayout, nullptr);
         
@@ -922,8 +954,7 @@ namespace Skip {
             if (hasStencilComponent(format)) {
                 barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
             }
-        }
-        else {
+        } else {
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         }
 
@@ -940,16 +971,14 @@ namespace Skip {
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
             destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        }
-        else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+        } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
             newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
 
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
             destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        }
-        else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+        } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
             newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
 
             barrier.srcAccessMask = 0;
@@ -957,8 +986,7 @@ namespace Skip {
                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
             sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
             destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        }
-        else {
+        } else {
             throw std::invalid_argument("Unsupported layout transition!");
         }
 
@@ -1248,7 +1276,7 @@ namespace Skip {
             samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
             //anisotropic filtering
             samplerInfo.anisotropyEnable = VK_TRUE;
-            samplerInfo.maxAnisotropy = 16;
+            samplerInfo.maxAnisotropy = 16.0f;
             // border color when sampling beyond image (can't specify arbitrary color)
             samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
             // if true: [0, texWidth) and [0, texHeight)
@@ -1273,13 +1301,13 @@ namespace Skip {
 
     void VulkanSwapchain::loadModels() {
 
-        for (ModelObject modelObject: _modelObjects) {
+        for (size_t i = 0; i < _modelObjects.size(); i++) {
             tinyobj::attrib_t attrib;
             std::vector<tinyobj::shape_t> shapes;
             std::vector<tinyobj::material_t> materials;
             std::string warn, err;
 
-            if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, modelObject.modelPath.c_str())) {
+            if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, _modelObjects[i].modelPath.c_str())) {
                 throw std::runtime_error(warn + err);
             }
 
@@ -1306,11 +1334,11 @@ namespace Skip {
                     };
 
                     vertex.color = { 1.0f, 1.0f, 1.0f };
-                    if (modelObject.uniqueVertices.count(vertex) == 0) {
-                        modelObject.uniqueVertices[vertex] = static_cast<uint32_t>(modelObject.vertices.size());
-                        modelObject.vertices.push_back(vertex);
+                    if (_modelObjects[i].uniqueVertices.count(vertex) == 0) {
+                        _modelObjects[i].uniqueVertices[vertex] = static_cast<uint32_t>(_modelObjects[i].vertices.size());
+                        _modelObjects[i].vertices.push_back(vertex);
                     }
-                    modelObject.indices.push_back(modelObject.uniqueVertices[vertex]);
+                    _modelObjects[i].indices.push_back(_modelObjects[i].uniqueVertices[vertex]);
                 }
             }
         }
@@ -1325,8 +1353,8 @@ namespace Skip {
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        for (ModelObject modelObject : _modelObjects) {
-            VkDeviceSize bufferSize = sizeof(modelObject.vertices[0]) * modelObject.vertices.size();
+        for (size_t i = 0; i < _modelObjects.size(); i++) {
+            VkDeviceSize bufferSize = sizeof(_modelObjects[i].vertices[0]) * _modelObjects[i].vertices.size();
 
             // TRANSFER_SRC - source of transfer
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1340,14 +1368,14 @@ namespace Skip {
             // after writing to mapped memory or use a memory heap that is host coherent
             void* data;
             vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
-            memcpy(data, modelObject.vertices.data(), (size_t)bufferSize);
+            memcpy(data, _modelObjects[i].vertices.data(), (size_t)bufferSize);
             vkUnmapMemory(logicalDevice, stagingBufferMemory);
 
             // TRANSFER_DST - transfer destination
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, modelObject.vertexBuffer, modelObject.vertexBufferMemory);
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _modelObjects[i].vertexBuffer, _modelObjects[i].vertexBufferMemory);
 
-            copyBuffer(stagingBuffer, modelObject.vertexBuffer, bufferSize);
+            copyBuffer(stagingBuffer, _modelObjects[i].vertexBuffer, bufferSize);
 
             vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
             vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
@@ -1375,8 +1403,8 @@ namespace Skip {
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        for (ModelObject modelObject : _modelObjects) {
-            VkDeviceSize bufferSize = sizeof(modelObject.indices[0]) * modelObject.indices.size();
+        for (size_t i = 0; i < _modelObjects.size(); i++) {
+            VkDeviceSize bufferSize = sizeof(_modelObjects[i].indices[0]) * _modelObjects[i].indices.size();
             
             // TRANSFER_SRC - source of transfer
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1389,14 +1417,14 @@ namespace Skip {
             // after writing to mapped memory or use a memory heap that is host coherent
             void* data;
             vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
-            memcpy(data, modelObject.indices.data(), (size_t)bufferSize);
+            memcpy(data, _modelObjects[i].indices.data(), (size_t)bufferSize);
             vkUnmapMemory(logicalDevice, stagingBufferMemory);
 
             // TRANSFER_DST - transfer destination
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, modelObject.indexBuffer, modelObject.indexBufferMemory);
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _modelObjects[i].indexBuffer, _modelObjects[i].indexBufferMemory);
 
-            copyBuffer(stagingBuffer, modelObject.indexBuffer, bufferSize);
+            copyBuffer(stagingBuffer, _modelObjects[i].indexBuffer, bufferSize);
 
             vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
             vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
@@ -1469,11 +1497,13 @@ namespace Skip {
 
             // This is dependent on Models Loaded
             std::vector<VkDescriptorImageInfo> imageInfos;
-            imageInfos.resize(_modelObjects.size());
-            for (size_t j = 0; j < _swapChainImages.size(); j++) {
-                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfos[j].imageView = _modelObjects[i].textureImageView;
-                imageInfos[j].sampler = _modelObjects[i].textureSampler;
+            //imageInfos.resize(_modelObjects.size());
+            for (size_t j = 0; j < _modelObjects.size(); j++) {
+                VkDescriptorImageInfo imageInfo{};
+                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfo.imageView = _modelObjects[j].textureImageView;
+                imageInfo.sampler = _modelObjects[j].textureSampler;
+                imageInfos.push_back(imageInfo);
             }
 
             std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
@@ -1493,7 +1523,7 @@ namespace Skip {
             descriptorWrites[1].dstArrayElement = 0; // not using array
             descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             descriptorWrites[1].pBufferInfo = nullptr;
-            descriptorWrites[1].descriptorCount = imageInfos.size();
+            descriptorWrites[1].descriptorCount = static_cast<uint32_t>(imageInfos.size());
             descriptorWrites[1].pImageInfo = imageInfos.data();
             descriptorWrites[1].pTexelBufferView = nullptr;
 
@@ -1578,7 +1608,7 @@ namespace Skip {
             //       and check vertex/index buffer management
             std::vector<VkBuffer> vertexBuffers;
             std::vector<VkBuffer> indexBuffers;
-            uint32_t indicesSize;
+            uint32_t indicesSize = 0;
             for ( ModelObject modelObject: _modelObjects ) {
                 vertexBuffers.push_back(modelObject.vertexBuffer);
                 indexBuffers.push_back(modelObject.indexBuffer);

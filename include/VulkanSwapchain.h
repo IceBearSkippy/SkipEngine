@@ -90,9 +90,7 @@ namespace Skip {
 		VulkanDevice* _vkDevice = nullptr;
 		VulkanWindow* _vkWindow = nullptr;
 
-		void drawFrame();
-		// updateUniformBuffer can be more front facing..
-		void updateUniformBuffer(uint32_t currentImage);
+		
 
 		VkSwapchainKHR _swapChain;
 		std::vector<VkImage> _swapChainImages;
@@ -134,6 +132,10 @@ namespace Skip {
 
 		//handle resizing
 		bool _framebufferResized = false;
+
+		void drawFrame();
+		// updateUniformBuffer can be more front facing..
+		void updateUniformBuffer(uint32_t currentImage);
 
 		void recreateSwapChain();
 		void cleanupSwapChain();
