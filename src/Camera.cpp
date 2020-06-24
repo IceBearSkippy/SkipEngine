@@ -2,62 +2,68 @@
 
 namespace Skip {
 
-    Camera::Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH)
-        : front(glm::vec3(0.0f, 0.0f, -1.0f)), movementSpeed(SPEED), mouseSensitivity(SENSITIVTY), zoom(ZOOM) {
-        this->position = position;
-        this->worldUp = up;
-        this->yaw = yaw;
-        this->pitch = pitch;
+    Camera::Camera() 
+        : _front(glm::vec3(0.0f, 0.0f, -1.0f)), _movementSpeed(SPEED), _mouseSensitivity(SENSITIVTY), _zoom(ZOOM) {
+    }
+
+    Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
+        : _front(glm::vec3(0.0f, 0.0f, -1.0f)), _movementSpeed(SPEED), _mouseSensitivity(SENSITIVTY), _zoom(ZOOM) {
+        this->_position = position;
+        this->_worldUp = up;
+        this->_yaw = yaw;
+        this->_pitch = pitch;
         this->updateCameraVectors();
     }
 
     Camera::Camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch)
-        : front(glm::vec3(0.0f, 0.0f, -1.0f)), movementSpeed(SPEED), mouseSensitivity(SENSITIVTY), zoom(ZOOM) {
-        this->position = glm::vec3(posX, posY, posZ);
-        this->worldUp = glm::vec3(upX, upY, upZ);
-        this->yaw = yaw;
-        this->pitch = pitch;
+        : _front(glm::vec3(0.0f, 0.0f, -1.0f)), _movementSpeed(SPEED), _mouseSensitivity(SENSITIVTY), _zoom(ZOOM) {
+        this->_position = glm::vec3(posX, posY, posZ);
+        this->_worldUp = glm::vec3(upX, upY, upZ);
+        this->_yaw = yaw;
+        this->_pitch = pitch;
         this->updateCameraVectors();
     }
+    
+    Camera::~Camera() {}
 
     glm::mat4 Camera::GetViewMatrix() {
-        return glm::lookAt(this->position, this->position + this->front, this->up);
+        return glm::lookAt(this->_position, this->_position + this->_front, this->_up);
     }
 
     void Camera::ProcessKeyboard(Camera_Movement direction, float deltaTime) {
-        float velocity = this->movementSpeed * deltaTime;
+        float velocity = this->_movementSpeed * deltaTime;
 
         if (direction == FORWARD) {
-            this->position += this->front * velocity;
+            this->_position += this->_front * velocity;
         }
 
         if (direction == BACKWARD) {
-            this->position -= this->front * velocity;
+            this->_position -= this->_front * velocity;
         }
 
         if (direction == LEFT) {
-            this->position -= this->right * velocity;
+            this->_position -= this->_right * velocity;
         }
 
         if (direction == RIGHT) {
-            this->position += this->right * velocity;
+            this->_position += this->_right * velocity;
         }
     }
 
     void Camera::ProcessMouseMovement(float xOffset, float yOffset, bool constrainPitch = true) {
-        xOffset *= this->mouseSensitivity;
-        yOffset *= this->mouseSensitivity;
+        xOffset *= this->_mouseSensitivity;
+        yOffset *= this->_mouseSensitivity;
 
-        this->yaw += xOffset;
-        this->pitch += yOffset;
+        this->_yaw += xOffset;
+        this->_pitch += yOffset;
 
         if (constrainPitch) {
-            if (this->pitch > 89.0f) {
-                this->pitch = 89.0f;
+            if (this->_pitch > 89.0f) {
+                this->_pitch = 89.0f;
             }
 
-            if (this->pitch < -89.0f) {
-                this->pitch = -89.0f;
+            if (this->_pitch < -89.0f) {
+                this->_pitch = -89.0f;
             }
         }
 
@@ -69,29 +75,29 @@ namespace Skip {
     }
 
     float Camera::GetZoom() {
-        return this->zoom;
+        return this->_zoom;
     }
 
     glm::vec3 Camera::GetPosition() {
-        return this->position;
+        return this->_position;
     }
 
     glm::vec3 Camera::GetFront() {
-        return this->front;
+        return this->_front;
     }
     glm::vec3 Camera::GetUp() {
-        return this->up;
+        return this->_up;
     }
 
     void Camera::updateCameraVectors() {
         // Calculate the new Front vector
         glm::vec3 front;
-        front.x = cos(glm::radians(this->yaw)) * cos(glm::radians(this->pitch));
-        front.y = sin(glm::radians(this->pitch));
-        front.z = sin(glm::radians(this->yaw)) * cos(glm::radians(this->pitch));
-        this->front = glm::normalize(front);
+        front.x = cos(glm::radians(this->_yaw)) * cos(glm::radians(this->_pitch));
+        front.y = sin(glm::radians(this->_pitch));
+        front.z = sin(glm::radians(this->_yaw)) * cos(glm::radians(this->_pitch));
+        this->_front = glm::normalize(front);
         // Also re-calculate the Right and Up vector
-        this->right = glm::normalize(glm::cross(this->front, this->worldUp));  // Normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
-        this->up = glm::normalize(glm::cross(this->right, this->front));
+        this->_right = glm::normalize(glm::cross(this->_front, this->_worldUp));  // Normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
+        this->_up = glm::normalize(glm::cross(this->_right, this->_front));
     }
 }
