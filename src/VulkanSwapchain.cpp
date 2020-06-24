@@ -69,7 +69,7 @@ namespace Skip {
         vkDestroyDevice(logicalDevice, nullptr);
 	};
 
-    void VulkanSwapchain::drawFrame() {
+    uint32_t VulkanSwapchain::stageFrame() {
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         //wait for the frame to be finished
         vkWaitForFences(logicalDevice, 1, &_inFlightFences[_currentFrame], VK_TRUE, UINT64_MAX);
@@ -88,7 +88,11 @@ namespace Skip {
         // Mark the image as now being in use by this frame
         _imagesInFlight[imageIndex] = _inFlightFences[_currentFrame];
 
-        updateUniformBuffer(imageIndex);
+        return imageIndex;
+    }
+
+    void VulkanSwapchain::drawFrame(uint32_t currentImage) {
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
 
         //Submitting the command buffer
         VkSubmitInfo submitInfo{};
@@ -104,7 +108,7 @@ namespace Skip {
 
         //specify which command buffers to actually submit for execution
         submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &_commandBuffers[imageIndex];
+        submitInfo.pCommandBuffers = &_commandBuffers[currentImage];
 
         // specify which semaphore (renderFinishedSemaphore) to signal
         // once the command buffer has finished executing 
@@ -131,7 +135,7 @@ namespace Skip {
         VkSwapchainKHR swapChains[] = { _swapChain };
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = swapChains;
-        presentInfo.pImageIndices = &imageIndex;
+        presentInfo.pImageIndices = &currentImage;
 
         // Specify an array of VkResult values to check for every
         // individual swap chain.
@@ -150,26 +154,15 @@ namespace Skip {
         _currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    void VulkanSwapchain::updateUniformBuffer(uint32_t currentImage) {
-        // Generate a new tranformation every frame (spin it around)
-        static auto startTime = std::chrono::high_resolution_clock::now();
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-        UniformBufferObject ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    void VulkanSwapchain::updateUniformBuffer(UniformBufferObject ubo, uint32_t currentImage) {
         ubo.proj = glm::perspective(glm::radians(45.0f), _swapChainExtent.width / (float)_swapChainExtent.height, 0.1f, 10.0f);
 
         // Flip the signs. Keep this to allow for inverted y coordinate system
         ubo.proj[1][1] *= -1;
-
         void* data;
         vkMapMemory(*_vkDevice->getLogicalDevice(), _uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
         memcpy(data, &ubo, sizeof(ubo));
         vkUnmapMemory(*_vkDevice->getLogicalDevice(), _uniformBuffersMemory[currentImage]);
-
     }
 
     VkVertexInputBindingDescription Vertex::getBindingDescription() {

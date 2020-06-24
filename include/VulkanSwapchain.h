@@ -133,10 +133,9 @@ namespace Skip {
 		//handle resizing
 		bool _framebufferResized = false;
 
-		void drawFrame();
-		// updateUniformBuffer can be more front facing..
-		void updateUniformBuffer(uint32_t currentImage);
-
+		uint32_t stageFrame();
+		void updateUniformBuffer(UniformBufferObject ubo, uint32_t currentImage);
+		void drawFrame(uint32_t currentImage);
 		void recreateSwapChain();
 		void cleanupSwapChain();
 	private:
