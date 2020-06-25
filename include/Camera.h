@@ -1,5 +1,5 @@
 #pragma once
-
+#include <GLFW/glfw3.h>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
@@ -22,6 +22,7 @@ enum Camera_Movement {
     LEFT,
     RIGHT
 };
+
 namespace Skip {
 
     // An abstract camera class that processes input and calculates the corresponding Eular Angles, Vectors and Matrices
@@ -36,11 +37,12 @@ namespace Skip {
         Camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch);
 
         ~Camera();
+
         glm::mat4 GetViewMatrix();
         void ProcessKeyboard(Camera_Movement direction, float deltaTime);
 
         // Processes input received from a mouse input system. Expects the offset value in both the x and y direction.
-        void ProcessMouseMovement(float xOffset, float yOffset, bool constrainPitch);
+        void ProcessMouseMovement(float xOffset, float yOffset, bool constrainPitch = true);
 
         // Processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis
         void ProcessMouseScroll(float yOffset);
@@ -52,7 +54,6 @@ namespace Skip {
         glm::vec3 GetFront();
 
         glm::vec3 GetUp();
-
     private:
         // Camera Attributes
         glm::vec3 _position;
@@ -69,7 +70,7 @@ namespace Skip {
         float _movementSpeed;
         float _mouseSensitivity;
         float _zoom;
-
+        
         // Calculates the front vector from the Camera's (updated) Eular Angles
         void updateCameraVectors();
     };

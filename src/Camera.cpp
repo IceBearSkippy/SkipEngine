@@ -26,6 +26,8 @@ namespace Skip {
     
     Camera::~Camera() {}
 
+    
+
     glm::mat4 Camera::GetViewMatrix() {
         return glm::lookAt(this->_position, this->_position + this->_front, this->_up);
     }
@@ -50,7 +52,7 @@ namespace Skip {
         }
     }
 
-    void Camera::ProcessMouseMovement(float xOffset, float yOffset, bool constrainPitch = true) {
+    void Camera::ProcessMouseMovement(float xOffset, float yOffset, bool constrainPitch) {
         xOffset *= this->_mouseSensitivity;
         yOffset *= this->_mouseSensitivity;
 
