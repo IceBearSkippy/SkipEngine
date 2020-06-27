@@ -33,6 +33,7 @@ list ( APPEND PROJECT_EXECUTABLE_FILES
   ${SOURCE_FOLDER}/Camera.cpp
   ${SOURCE_FOLDER}/main.cpp
   ${SOURCE_FOLDER}/objects/SkipObject.cpp
+  ${SOURCE_FOLDER}/objects/ModelObject.cpp
 
 )
 
