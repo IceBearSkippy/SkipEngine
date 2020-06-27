@@ -2,20 +2,28 @@
 
 namespace Skip {
 
-    ModelObject::ModelObject() {
+    const std::string DEFAULT_MODEL = "defaults/cube.obj";
 
+    ModelObject::ModelObject() 
+        : SkipObject(), _modelPath(DEFAULT_MODEL) {
+
+    }
+
+    ModelObject::ModelObject(glm::vec3 position, std::string texturePath, std::string model_path)
+        : SkipObject(position, texturePath) {
+        _modelPath = model_path;
     }
 
     ModelObject::~ModelObject() {
     }
 
-    ModelObject::loadModel() {
+    void ModelObject::loadModel() {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
         std::string warn, err;
 
-        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, _skipObjects[i]->_modelPath.c_str())) {
+        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, _modelPath.c_str())) {
             throw std::runtime_error(warn + err);
         }
 
@@ -42,11 +50,11 @@ namespace Skip {
                 };
 
                 vertex.color = { 1.0f, 1.0f, 1.0f };
-                if (_skipObjects[i]->_uniqueVertices.count(vertex) == 0) {
-                    _skipObjects[i]->_uniqueVertices[vertex] = static_cast<uint32_t>(_skipObjects[i]->_vertices.size());
-                    _skipObjects[i]->_vertices.push_back(vertex);
+                if (_uniqueVertices.count(vertex) == 0) {
+                    _uniqueVertices[vertex] = static_cast<uint32_t>(_vertices.size());
+                    _vertices.push_back(vertex);
                 }
-                _skipObjects[i]->_indices.push_back(_skipObjects[i]->_uniqueVertices[vertex]);
+                _indices.push_back(_uniqueVertices[vertex]);
             }
         }
     }
