@@ -10,6 +10,9 @@
 #include <array>
 #include <vulkan/vulkan.h>
 
+// TODO: Add no_texture.png 
+const std::string DEFAULT_TEXTURE = "defaults/no_texture.png";
+
 namespace Skip {
 
     struct Vertex {
@@ -45,11 +48,10 @@ namespace Skip {
     class SkipObject
     {
     public:
-        SkipObject();
-        ~SkipObject();
+        SkipObject(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE);
 
-        void loadModel();
-        
+        ~SkipObject();
+        virtual void loadModel() = 0;
 
         glm::vec3 _position;
         

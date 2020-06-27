@@ -1,11 +1,12 @@
 #include <objects/SkipObject.h>
-
+#include <iostream>
 namespace Skip {
 
-	SkipObject::SkipObject() {
 
-	}
-
+    SkipObject::SkipObject(glm::vec3 position, std::string texturePath ) {
+        _position = position;
+        _texturePath = texturePath;
+    }
 	SkipObject::~SkipObject() {
 	}
 
@@ -40,8 +41,5 @@ namespace Skip {
         return attributeDescriptions;
     }
 
-    void SkipObject::loadModel() {
-
-    }
 }
 
