@@ -1264,7 +1264,6 @@ namespace Skip {
 
 
     void VulkanSwapchain::loadModels() {
-
         for (size_t i = 0; i < _skipObjects.size(); i++) {
             _skipObjects[i]->loadModel();
         }
@@ -1427,8 +1426,8 @@ namespace Skip {
             for (size_t j = 0; j < _skipObjects.size(); j++) {
                 VkDescriptorImageInfo imageInfo{};
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = _skipObjects[i]->_textureImageView;
-                imageInfo.sampler = _skipObjects[i]->_textureSampler;
+                imageInfo.imageView = _skipObjects[j]->_textureImageView;
+                imageInfo.sampler = _skipObjects[j]->_textureSampler;
                 imageInfos.push_back(imageInfo);
             }
 
