@@ -30,7 +30,10 @@ list ( APPEND PROJECT_EXECUTABLE_FILES
   ${SOURCE_FOLDER}/VulkanDevice.cpp
   ${SOURCE_FOLDER}/VulkanSwapchain.cpp
   ${SOURCE_FOLDER}/VulkanManager.cpp
+  ${SOURCE_FOLDER}/Camera.cpp
   ${SOURCE_FOLDER}/main.cpp
+  ${SOURCE_FOLDER}/objects/SkipObject.cpp
+
 )
 
 # include files

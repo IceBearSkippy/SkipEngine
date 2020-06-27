@@ -25,6 +25,8 @@ namespace Skip {
 
 	struct SwapchainDetails;
 	struct ModelObject;
+	
+	struct UniformBufferObject;
 
 	const std::vector<const char*> deviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -38,7 +40,7 @@ namespace Skip {
 		void init();
 		bool checkValidationLayerSupport();
 
-		void drawFrame();
+		void drawFrame(uint32_t currentImage);
 
 		VulkanWindow* _window;
 		bool _enableValidationLayers;

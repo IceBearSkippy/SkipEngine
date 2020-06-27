@@ -9,10 +9,10 @@ namespace Skip {
 
     VulkanSwapchain::VulkanSwapchain() {};
 
-	VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<ModelObject> modelObjects) {
+	VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<SkipObject*> skipObjects) {
         _vkDevice = vkDevice;
         _vkWindow = vkWindow;
-        _modelObjects = modelObjects;
+        _skipObjects = skipObjects;
         _currentFrame = 0;
         this->createSwapChain();
         this->createImageViews();
@@ -43,18 +43,18 @@ namespace Skip {
         this->cleanupSwapChain();
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
-        for (size_t i = 0; i < _modelObjects.size(); i++) {
-            vkDestroySampler(logicalDevice, _modelObjects[i].textureSampler, nullptr);
-            vkDestroyImageView(logicalDevice, _modelObjects[i].textureImageView, nullptr);
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
+            vkDestroySampler(logicalDevice, _skipObjects[i]->_textureSampler, nullptr);
+            vkDestroyImageView(logicalDevice, _skipObjects[i]->_textureImageView, nullptr);
 
-            vkDestroyImage(logicalDevice, _modelObjects[i].textureImage, nullptr);
-            vkFreeMemory(logicalDevice, _modelObjects[i].textureImageMemory, nullptr);
+            vkDestroyImage(logicalDevice, _skipObjects[i]->_textureImage, nullptr);
+            vkFreeMemory(logicalDevice, _skipObjects[i]->_textureImageMemory, nullptr);
 
-            vkDestroyBuffer(logicalDevice, _modelObjects[i].indexBuffer, nullptr);
-            vkFreeMemory(logicalDevice, _modelObjects[i].indexBufferMemory, nullptr);
+            vkDestroyBuffer(logicalDevice, _skipObjects[i]->_indexBuffer, nullptr);
+            vkFreeMemory(logicalDevice, _skipObjects[i]->_indexBufferMemory, nullptr);
 
-            vkDestroyBuffer(logicalDevice, _modelObjects[i].vertexBuffer, nullptr);
-            vkFreeMemory(logicalDevice, _modelObjects[i].vertexBufferMemory, nullptr);
+            vkDestroyBuffer(logicalDevice, _skipObjects[i]->_vertexBuffer, nullptr);
+            vkFreeMemory(logicalDevice, _skipObjects[i]->_vertexBufferMemory, nullptr);
         }
 
         vkDestroyDescriptorSetLayout(logicalDevice, _descriptorSetLayout, nullptr);
@@ -69,7 +69,7 @@ namespace Skip {
         vkDestroyDevice(logicalDevice, nullptr);
 	};
 
-    void VulkanSwapchain::drawFrame() {
+    uint32_t VulkanSwapchain::stageFrame() {
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         //wait for the frame to be finished
         vkWaitForFences(logicalDevice, 1, &_inFlightFences[_currentFrame], VK_TRUE, UINT64_MAX);
@@ -88,7 +88,11 @@ namespace Skip {
         // Mark the image as now being in use by this frame
         _imagesInFlight[imageIndex] = _inFlightFences[_currentFrame];
 
-        updateUniformBuffer(imageIndex);
+        return imageIndex;
+    }
+
+    void VulkanSwapchain::drawFrame(uint32_t currentImage) {
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
 
         //Submitting the command buffer
         VkSubmitInfo submitInfo{};
@@ -104,7 +108,7 @@ namespace Skip {
 
         //specify which command buffers to actually submit for execution
         submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &_commandBuffers[imageIndex];
+        submitInfo.pCommandBuffers = &_commandBuffers[currentImage];
 
         // specify which semaphore (renderFinishedSemaphore) to signal
         // once the command buffer has finished executing 
@@ -131,7 +135,7 @@ namespace Skip {
         VkSwapchainKHR swapChains[] = { _swapChain };
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = swapChains;
-        presentInfo.pImageIndices = &imageIndex;
+        presentInfo.pImageIndices = &currentImage;
 
         // Specify an array of VkResult values to check for every
         // individual swap chain.
@@ -150,58 +154,18 @@ namespace Skip {
         _currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    void VulkanSwapchain::updateUniformBuffer(uint32_t currentImage) {
-        // Generate a new tranformation every frame (spin it around)
-        static auto startTime = std::chrono::high_resolution_clock::now();
-
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-        UniformBufferObject ubo{};
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-        ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    void VulkanSwapchain::updateUniformBuffer(UniformBufferObject ubo, uint32_t currentImage) {
         ubo.proj = glm::perspective(glm::radians(45.0f), _swapChainExtent.width / (float)_swapChainExtent.height, 0.1f, 10.0f);
 
         // Flip the signs. Keep this to allow for inverted y coordinate system
         ubo.proj[1][1] *= -1;
-
         void* data;
         vkMapMemory(*_vkDevice->getLogicalDevice(), _uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
         memcpy(data, &ubo, sizeof(ubo));
         vkUnmapMemory(*_vkDevice->getLogicalDevice(), _uniformBuffersMemory[currentImage]);
-
     }
 
-    VkVertexInputBindingDescription Vertex::getBindingDescription() {
-        // manage attribute binding per vertex
-        VkVertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0; // specifies the index of the binding in the array of bindings
-        bindingDescription.stride = sizeof(Vertex); // number of bytes from one entry to next
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return bindingDescription;
-    }
-
-    std::array<VkVertexInputAttributeDescription, 3> Vertex::getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
-        // we have two attributes: position and color (hence the size)
-        attributeDescriptions[0].binding = 0; // binding the per-vertex data
-        attributeDescriptions[0].location = 0; // location directive of the input in the vertex shader
-        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT; // type of data (look at reference guide)
-        attributeDescriptions[0].offset = offsetof(Vertex, pos); // specifies the number of bytes since the start of the per-vertex data
-
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-
-        return attributeDescriptions;
-    }
+    
 
 
     // recreateSwapChain is called when we draw frames
@@ -1040,15 +1004,15 @@ namespace Skip {
         // need a default texturePath
         
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
-        for (size_t i = 0; i < _modelObjects.size(); i++) {
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
             int texWidth, texHeight, texChannels;
 
 
-            stbi_uc* pixels = stbi_load(_modelObjects[i].texturePath.c_str(), &texWidth,
+            stbi_uc* pixels = stbi_load(_skipObjects[i]->_texturePath.c_str(), &texWidth,
                 &texHeight, &texChannels, STBI_rgb_alpha);
             VkDeviceSize imageSize = texWidth * texHeight * 4;
 
-            _modelObjects[i].mipLevels = static_cast<uint32_t>(floor(log2(std::max(texWidth, texHeight)))) + 1;
+            _skipObjects[i]->_mipLevels = static_cast<uint32_t>(floor(log2(std::max(texWidth, texHeight)))) + 1;
 
             if (!pixels) {
                 throw std::runtime_error("Failed to load texture image!");
@@ -1068,21 +1032,21 @@ namespace Skip {
 
             stbi_image_free(pixels);
 
-            createImage(texWidth, texHeight, _modelObjects[i].mipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+            createImage(texWidth, texHeight, _skipObjects[i]->_mipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _modelObjects[i].textureImage, _modelObjects[i].textureImageMemory);
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _skipObjects[i]->_textureImage, _skipObjects[i]->_textureImageMemory);
 
             // image layout to transfer (pipeline barrier)
-            transitionImageLayout(_modelObjects[i].textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _modelObjects[i].mipLevels);
+            transitionImageLayout(_skipObjects[i]->_textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _skipObjects[i]->_mipLevels);
             //copy to staging buffer
-            copyBufferToImage(stagingBuffer, _modelObjects[i].textureImage,
+            copyBufferToImage(stagingBuffer, _skipObjects[i]->_textureImage,
                 static_cast<uint32_t>(texWidth),
                 static_cast<uint32_t>(texHeight));
             // prepare image for shader access
             // moved the VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL transitioning to mipmap method
             // TODO: can we make mipmapping optional?
-            generateMipmaps(_modelObjects[i].textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, _modelObjects[i].mipLevels);
+            generateMipmaps(_skipObjects[i]->_textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, _skipObjects[i]->_mipLevels);
 
             vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
             vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
@@ -1255,15 +1219,15 @@ namespace Skip {
     }
 
     void VulkanSwapchain::createTextureImageViews() {
-        for (size_t i = 0; i < _modelObjects.size(); i++) {
-            _modelObjects[i].textureImageView = createImageView(_modelObjects[i].textureImage, VK_FORMAT_R8G8B8A8_SRGB,
-                VK_IMAGE_ASPECT_COLOR_BIT, _modelObjects[i].mipLevels);
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
+            _skipObjects[i]->_textureImageView = createImageView(_skipObjects[i]->_textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+                VK_IMAGE_ASPECT_COLOR_BIT, _skipObjects[i]->_mipLevels);
         }
     }
 
     void VulkanSwapchain::createTextureSamplers() {
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
-        for (size_t i = 0; i < _modelObjects.size(); i++) {
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
             VkSamplerCreateInfo samplerInfo{};
             samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
             // specify how to interpolate texels -- other option is VK_FILTER_NEAREST
@@ -1290,9 +1254,9 @@ namespace Skip {
             samplerInfo.mipLodBias = 0.0f;
             // using the higher mip map levels will result in more blurry (as in for distance)
             samplerInfo.minLod = 0.0f;
-            samplerInfo.maxLod = static_cast<float>(_modelObjects[i].mipLevels); // Max level of detail
+            samplerInfo.maxLod = static_cast<float>(_skipObjects[i]->_mipLevels); // Max level of detail
 
-            if (vkCreateSampler(logicalDevice, &samplerInfo, nullptr, &_modelObjects[i].textureSampler) != VK_SUCCESS) {
+            if (vkCreateSampler(logicalDevice, &samplerInfo, nullptr, &_skipObjects[i]->_textureSampler) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to create a texture sampler!");
             }
         }
@@ -1301,46 +1265,8 @@ namespace Skip {
 
     void VulkanSwapchain::loadModels() {
 
-        for (size_t i = 0; i < _modelObjects.size(); i++) {
-            tinyobj::attrib_t attrib;
-            std::vector<tinyobj::shape_t> shapes;
-            std::vector<tinyobj::material_t> materials;
-            std::string warn, err;
-
-            if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, _modelObjects[i].modelPath.c_str())) {
-                throw std::runtime_error(warn + err);
-            }
-
-            // attrib container holds pos, norms and tex coords
-            // shapes container has all seperate objects and faces
-            // in our case, we are ignoring material/texture per face
-
-            //combine all faces in the file into a single model
-            for (const auto& shape : shapes) {
-                for (const auto& index : shape.mesh.indices) {
-                    Vertex vertex{};
-
-                    vertex.pos = {
-                        attrib.vertices[3 * index.vertex_index + 0],
-                        attrib.vertices[3 * index.vertex_index + 1],
-                        attrib.vertices[3 * index.vertex_index + 2]
-                    };
-
-                    // obj format assumes coord system where a vertical (y) coordinate of 0 
-                    // means bottom of the image
-                    vertex.texCoord = {
-                        attrib.texcoords[2 * index.texcoord_index + 0],
-                        1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-                    };
-
-                    vertex.color = { 1.0f, 1.0f, 1.0f };
-                    if (_modelObjects[i].uniqueVertices.count(vertex) == 0) {
-                        _modelObjects[i].uniqueVertices[vertex] = static_cast<uint32_t>(_modelObjects[i].vertices.size());
-                        _modelObjects[i].vertices.push_back(vertex);
-                    }
-                    _modelObjects[i].indices.push_back(_modelObjects[i].uniqueVertices[vertex]);
-                }
-            }
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
+            _skipObjects[i]->loadModel();
         }
     }
 
@@ -1353,8 +1279,8 @@ namespace Skip {
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        for (size_t i = 0; i < _modelObjects.size(); i++) {
-            VkDeviceSize bufferSize = sizeof(_modelObjects[i].vertices[0]) * _modelObjects[i].vertices.size();
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
+            VkDeviceSize bufferSize = sizeof(_skipObjects[i]->_vertices[0]) * _skipObjects[i]->_vertices.size();
 
             // TRANSFER_SRC - source of transfer
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1368,14 +1294,14 @@ namespace Skip {
             // after writing to mapped memory or use a memory heap that is host coherent
             void* data;
             vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
-            memcpy(data, _modelObjects[i].vertices.data(), (size_t)bufferSize);
+            memcpy(data, _skipObjects[i]->_vertices.data(), (size_t)bufferSize);
             vkUnmapMemory(logicalDevice, stagingBufferMemory);
 
             // TRANSFER_DST - transfer destination
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _modelObjects[i].vertexBuffer, _modelObjects[i].vertexBufferMemory);
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _skipObjects[i]->_vertexBuffer, _skipObjects[i]->_vertexBufferMemory);
 
-            copyBuffer(stagingBuffer, _modelObjects[i].vertexBuffer, bufferSize);
+            copyBuffer(stagingBuffer, _skipObjects[i]->_vertexBuffer, bufferSize);
 
             vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
             vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
@@ -1398,13 +1324,13 @@ namespace Skip {
 
     void VulkanSwapchain::createIndexBuffers() {
         // TODO:
-        // Not all ModelObjects will need to create index buffers, but it is faster for loading
+        // Not all SkipObjects will need to create index buffers, but it is faster for loading
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        for (size_t i = 0; i < _modelObjects.size(); i++) {
-            VkDeviceSize bufferSize = sizeof(_modelObjects[i].indices[0]) * _modelObjects[i].indices.size();
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
+            VkDeviceSize bufferSize = sizeof(_skipObjects[i]->_indices[0]) * _skipObjects[i]->_indices.size();
             
             // TRANSFER_SRC - source of transfer
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1417,14 +1343,14 @@ namespace Skip {
             // after writing to mapped memory or use a memory heap that is host coherent
             void* data;
             vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
-            memcpy(data, _modelObjects[i].indices.data(), (size_t)bufferSize);
+            memcpy(data, _skipObjects[i]->_indices.data(), (size_t)bufferSize);
             vkUnmapMemory(logicalDevice, stagingBufferMemory);
 
             // TRANSFER_DST - transfer destination
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _modelObjects[i].indexBuffer, _modelObjects[i].indexBufferMemory);
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _skipObjects[i]->_indexBuffer, _skipObjects[i]->_indexBufferMemory);
 
-            copyBuffer(stagingBuffer, _modelObjects[i].indexBuffer, bufferSize);
+            copyBuffer(stagingBuffer, _skipObjects[i]->_indexBuffer, bufferSize);
 
             vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
             vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
@@ -1498,11 +1424,11 @@ namespace Skip {
             // This is dependent on Models Loaded
             std::vector<VkDescriptorImageInfo> imageInfos;
             //imageInfos.resize(_modelObjects.size());
-            for (size_t j = 0; j < _modelObjects.size(); j++) {
+            for (size_t j = 0; j < _skipObjects.size(); j++) {
                 VkDescriptorImageInfo imageInfo{};
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = _modelObjects[j].textureImageView;
-                imageInfo.sampler = _modelObjects[j].textureSampler;
+                imageInfo.imageView = _skipObjects[i]->_textureImageView;
+                imageInfo.sampler = _skipObjects[i]->_textureSampler;
                 imageInfos.push_back(imageInfo);
             }
 
@@ -1609,10 +1535,10 @@ namespace Skip {
             std::vector<VkBuffer> vertexBuffers;
             std::vector<VkBuffer> indexBuffers;
             uint32_t indicesSize = 0;
-            for ( ModelObject modelObject: _modelObjects ) {
-                vertexBuffers.push_back(modelObject.vertexBuffer);
-                indexBuffers.push_back(modelObject.indexBuffer);
-                indicesSize += modelObject.indices.size();
+            for ( SkipObject* skipObject: _skipObjects ) {
+                vertexBuffers.push_back(skipObject->_vertexBuffer);
+                indexBuffers.push_back(skipObject->_indexBuffer);
+                indicesSize += skipObject->_indices.size();
             }
 
             VkDeviceSize offsets[] = {  0 };
