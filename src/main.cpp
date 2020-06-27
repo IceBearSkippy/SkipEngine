@@ -1,5 +1,6 @@
 ﻿#include <VulkanManager.h>
-
+#include <objects/SkipObject.h>
+#include <objects/ModelObject.h>
 using namespace std;
 
 Skip::VulkanWindow* window;
@@ -9,6 +10,11 @@ Skip::Camera* camera;
 
 int main()
 {
+	bool enableValidationLayers = false;
+	#ifndef NODEBUG
+		enableValidationLayers = true;
+	#endif
+
 	// Main is our application
 	// We will interact with Vulkan manager and vulkan window
 	// GLFW will live in VulkanWindow and have public access
@@ -16,21 +22,25 @@ int main()
 	// create components
 	camera = new Skip::Camera(glm::vec3(2.0f, 2.0f, 2.0f));
 
+	Skip::ModelObject* modelObject = new Skip::ModelObject(
+		glm::vec3(0.0f, 0.0f, 0.0f),
+		"resources/textures/viking_room.png",
+		"resources/models/viking_room.obj"
+	);
+	std::vector<Skip::SkipObject*> skipObjects;
+	skipObjects.push_back(modelObject);
+
+
 	// create window
 	// Window will create keys to events based on components
 	window = new Skip::VulkanWindow(camera);
 	window->init();
-	vulkanManager = new Skip::VulkanManager(window);
 
-	//setup validation layers
-	#ifndef NODEBUG
-		vulkanManager->_enableValidationLayers = true;
-	#endif
-	vulkanManager->_validationLayers = {
-		"VK_LAYER_KHRONOS_validation"
-	};
 	
-	vulkanManager->init();
+
+	vulkanManager = new Skip::VulkanManager(window, skipObjects, enableValidationLayers);
+	//setup validation layers
+	
 	swapchain = vulkanManager->_vulkanSwapchain;
 
 	uint32_t currentImage;
