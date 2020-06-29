@@ -2,16 +2,20 @@
 
 namespace Skip {
 
-    const std::string DEFAULT_MODEL = "defaults/cube.obj";
+    const std::string DEFAULT_MODEL = "resources/defaults/box.obj";
 
     ModelObject::ModelObject() 
         : SkipObject(), _modelPath(DEFAULT_MODEL) {
 
     }
 
-    ModelObject::ModelObject(glm::vec3 position, std::string texturePath, std::string model_path)
+    ModelObject::ModelObject(glm::vec3 position, std::string texturePath)
+        : SkipObject(position, texturePath), _modelPath(DEFAULT_MODEL) {
+    }
+
+    ModelObject::ModelObject(glm::vec3 position, std::string texturePath, std::string modelPath)
         : SkipObject(position, texturePath) {
-        _modelPath = model_path;
+        _modelPath = modelPath;
     }
 
     ModelObject::~ModelObject() {

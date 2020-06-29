@@ -1,5 +1,5 @@
 #include <objects/SkipObject.h>
-#include <iostream>
+
 namespace Skip {
 
 

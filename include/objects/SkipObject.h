@@ -11,7 +11,7 @@
 #include <vulkan/vulkan.h>
 
 // TODO: Add no_texture.png 
-const std::string DEFAULT_TEXTURE = "defaults/no_texture.png";
+const std::string DEFAULT_TEXTURE = "resources/defaults/blue_texture.png";
 
 namespace Skip {
 
@@ -70,6 +70,10 @@ namespace Skip {
 
         VkBuffer _indexBuffer;
         VkDeviceMemory _indexBufferMemory;
+
+        UniformBufferObject _ubo{};
+        std::vector<VkBuffer> _uniformBuffers;
+        std::vector<VkDeviceMemory> _uniformBuffersMemory;
     private:
 
     };
