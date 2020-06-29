@@ -154,15 +154,14 @@ namespace Skip {
         _currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    void VulkanSwapchain::updateUniformBuffer(UniformBufferObject ubo, uint32_t currentImage) {
-        ubo.proj = glm::perspective(glm::radians(45.0f), _swapChainExtent.width / (float)_swapChainExtent.height, 0.1f, 10.0f);
-
-        // Flip the signs. Keep this to allow for inverted y coordinate system
-        ubo.proj[1][1] *= -1;
-        void* data;
-        vkMapMemory(*_vkDevice->getLogicalDevice(), _uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
-        memcpy(data, &ubo, sizeof(ubo));
-        vkUnmapMemory(*_vkDevice->getLogicalDevice(), _uniformBuffersMemory[currentImage]);
+    void VulkanSwapchain::updateUniformBuffers(uint32_t currentImage) {
+        
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
+            void* data;
+            vkMapMemory(*_vkDevice->getLogicalDevice(), _skipObjects[i]->_uniformBuffersMemory[currentImage], 0, sizeof(_skipObjects[i]->_ubo), 0, &data);
+            memcpy(data, &_skipObjects[i]->_ubo, sizeof(_skipObjects[i]->_ubo));
+            vkUnmapMemory(*_vkDevice->getLogicalDevice(), _skipObjects[i]->_uniformBuffersMemory[currentImage]);
+        }
     }
 
     
@@ -210,9 +209,11 @@ namespace Skip {
         for (size_t i = 0; i < _swapChainFramebuffers.size(); i++) {
             vkDestroyFramebuffer(logicalDevice, _swapChainFramebuffers[i], nullptr);
         }
-        for (size_t i = 0; i < _swapChainImages.size(); i++) {
-            vkDestroyBuffer(logicalDevice, _uniformBuffers[i], nullptr);
-            vkFreeMemory(logicalDevice, _uniformBuffersMemory[i], nullptr);
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
+            for (size_t j = 0; j < _swapChainImages.size(); j++) {
+                vkDestroyBuffer(logicalDevice, _skipObjects[i]->_uniformBuffers[j], nullptr);
+                vkFreeMemory(logicalDevice, _skipObjects[i]->_uniformBuffersMemory[j], nullptr);
+            }
         }
         vkDestroyDescriptorPool(logicalDevice, _descriptorPool, nullptr);
         vkFreeCommandBuffers(logicalDevice, _commandPool, static_cast<uint32_t>(_commandBuffers.size()),
@@ -1357,18 +1358,20 @@ namespace Skip {
     }
 
     void VulkanSwapchain::createUniformBuffers() {
-        // Is a uniform buffer needed for each model object?
         VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-        _uniformBuffers.resize(_swapChainImages.size());
-        _uniformBuffersMemory.resize(_swapChainImages.size());
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
+            _skipObjects[i]->_uniformBuffers.resize(_swapChainImages.size());
+            _skipObjects[i]->_uniformBuffersMemory.resize(_swapChainImages.size());
 
-        for (size_t i = 0; i < _swapChainImages.size(); i++) {
-            createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, _uniformBuffers[i],
-                _uniformBuffersMemory[i]);
+            for (size_t j = 0; j < _swapChainImages.size(); j++) {
+                createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, _skipObjects[i]->_uniformBuffers[j],
+                    _skipObjects[i]->_uniformBuffersMemory[j]);
+            }
         }
 
+        
     }
 
     void VulkanSwapchain::createDescriptorPool() {
@@ -1415,15 +1418,19 @@ namespace Skip {
 
         // descriptor sets need to be configured
         for (size_t i = 0; i < _swapChainImages.size(); i++) {
-            VkDescriptorBufferInfo bufferInfo{};
-            bufferInfo.buffer = _uniformBuffers[i];
-            bufferInfo.offset = 0;
-            bufferInfo.range = sizeof(UniformBufferObject);
+            
 
-            // This is dependent on Models Loaded
+            std::vector<VkDescriptorBufferInfo> bufferInfos;
             std::vector<VkDescriptorImageInfo> imageInfos;
             //imageInfos.resize(_modelObjects.size());
             for (size_t j = 0; j < _skipObjects.size(); j++) {
+
+                VkDescriptorBufferInfo bufferInfo{};
+                bufferInfo.buffer = _skipObjects[j]->_uniformBuffers[i];
+                bufferInfo.offset = 0;
+                bufferInfo.range = sizeof(UniformBufferObject);
+                bufferInfos.push_back(bufferInfo);
+
                 VkDescriptorImageInfo imageInfo{};
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 imageInfo.imageView = _skipObjects[j]->_textureImageView;
@@ -1438,7 +1445,7 @@ namespace Skip {
             descriptorWrites[0].dstArrayElement = 0; // not using array
             descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             descriptorWrites[0].descriptorCount = 1;
-            descriptorWrites[0].pBufferInfo = &bufferInfo;
+            descriptorWrites[0].pBufferInfo = bufferInfos.data();
             descriptorWrites[0].pImageInfo = nullptr; // Optional -- refer to image data
             descriptorWrites[0].pTexelBufferView = nullptr; // Optional -- refer to buffer views
 

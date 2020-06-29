@@ -8,8 +8,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-
-
 #include <vulkan/vulkan.h>
 #include <array>
 #include <fstream>
@@ -37,7 +35,6 @@ namespace Skip {
 		VulkanDevice* _vkDevice = nullptr;
 		VulkanWindow* _vkWindow = nullptr;
 
-		
 
 		VkSwapchainKHR _swapChain;
 		std::vector<VkImage> _swapChainImages;
@@ -59,9 +56,6 @@ namespace Skip {
 		std::vector<SkipObject*>  _skipObjects;
 		SwapchainDetails querySwapchain();
 
-		std::vector<VkBuffer> _uniformBuffers;
-		std::vector<VkDeviceMemory> _uniformBuffersMemory;
-
 		VkDescriptorPool _descriptorPool;
 		std::vector<VkDescriptorSet> _descriptorSets;
 		std::vector<VkCommandBuffer> _commandBuffers;
@@ -81,7 +75,7 @@ namespace Skip {
 		bool _framebufferResized = false;
 
 		uint32_t stageFrame();
-		void updateUniformBuffer(UniformBufferObject ubo, uint32_t currentImage);
+		void updateUniformBuffers(uint32_t currentImage);
 		void drawFrame(uint32_t currentImage);
 		void recreateSwapChain();
 		void cleanupSwapChain();
