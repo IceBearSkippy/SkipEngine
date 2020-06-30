@@ -1400,7 +1400,7 @@ namespace Skip {
     }
 
     void VulkanSwapchain::createDescriptorSets() {
-        // We'll create descriptor set for each swap chain image
+        // We'll create descriptor set for each SkipObject
         
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         std::vector<VkDescriptorSetLayout> layouts(_swapChainImages.size(), _descriptorSetLayout);
@@ -1408,7 +1408,7 @@ namespace Skip {
         VkDescriptorSetAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         allocInfo.descriptorPool = _descriptorPool;
-        allocInfo.descriptorSetCount = static_cast<uint32_t>(_swapChainImages.size());
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(_skipObjects.size());
         allocInfo.pSetLayouts = layouts.data();
 
         _descriptorSets.resize(_swapChainImages.size());
@@ -1416,28 +1416,22 @@ namespace Skip {
             throw std::runtime_error("Failed to allocated descriptor sets!");
         }
 
-        // descriptor sets need to be configured
-        for (size_t i = 0; i < _swapChainImages.size(); i++) {
-            
+        // descriptor sets need to be configured for each buffer
+        for (size_t i = 0; i < _skipObjects.size(); i++) {
 
-            std::vector<VkDescriptorBufferInfo> bufferInfos;
-            std::vector<VkDescriptorImageInfo> imageInfos;
-            //imageInfos.resize(_modelObjects.size());
-            for (size_t j = 0; j < _skipObjects.size(); j++) {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = *_skipObjects[i]->_uniformBuffers.data();
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(_skipObjects[i]->_uniformBuffers);
+            //bufferInfos.push_back(bufferInfo);
 
-                VkDescriptorBufferInfo bufferInfo{};
-                bufferInfo.buffer = _skipObjects[j]->_uniformBuffers[i];
-                bufferInfo.offset = 0;
-                bufferInfo.range = sizeof(UniformBufferObject);
-                bufferInfos.push_back(bufferInfo);
+            VkDescriptorImageInfo imageInfo{};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = _skipObjects[i]->_textureImageView;
+            imageInfo.sampler = _skipObjects[i]->_textureSampler;
+            //imageInfos.push_back(imageInfo);
 
-                VkDescriptorImageInfo imageInfo{};
-                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = _skipObjects[j]->_textureImageView;
-                imageInfo.sampler = _skipObjects[j]->_textureSampler;
-                imageInfos.push_back(imageInfo);
-            }
-
+            //TODO: Can create an array of descriptor writes for each object
             std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             descriptorWrites[0].dstSet = _descriptorSets[i];
@@ -1445,7 +1439,7 @@ namespace Skip {
             descriptorWrites[0].dstArrayElement = 0; // not using array
             descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             descriptorWrites[0].descriptorCount = 1;
-            descriptorWrites[0].pBufferInfo = bufferInfos.data();
+            descriptorWrites[0].pBufferInfo = &bufferInfo;
             descriptorWrites[0].pImageInfo = nullptr; // Optional -- refer to image data
             descriptorWrites[0].pTexelBufferView = nullptr; // Optional -- refer to buffer views
 
@@ -1455,8 +1449,8 @@ namespace Skip {
             descriptorWrites[1].dstArrayElement = 0; // not using array
             descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             descriptorWrites[1].pBufferInfo = nullptr;
-            descriptorWrites[1].descriptorCount = static_cast<uint32_t>(imageInfos.size());
-            descriptorWrites[1].pImageInfo = imageInfos.data();
+            descriptorWrites[1].descriptorCount = 1;
+            descriptorWrites[1].pImageInfo = &imageInfo;
             descriptorWrites[1].pTexelBufferView = nullptr;
 
             vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
@@ -1530,40 +1524,27 @@ namespace Skip {
 
             //Basic Drawing Commands
             vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
-
-            //draw the triangle -- uses hardcoded vertices
-            // cmdbuffer, vertexCount, instanceCount, firstVertex, firstInstance
-            //vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
             
-            //VkBuffer vertexBuffers[] = { vertexBuffer };
-            // TODO: try loading two different models at once
-            //       and check vertex/index buffer management
-            std::vector<VkBuffer> vertexBuffers;
-            std::vector<VkBuffer> indexBuffers;
-            uint32_t indicesSize = 0;
-            for ( SkipObject* skipObject: _skipObjects ) {
-                vertexBuffers.push_back(skipObject->_vertexBuffer);
-                indexBuffers.push_back(skipObject->_indexBuffer);
-                indicesSize += skipObject->_indices.size();
+
+
+            for (size_t j = 0; j < _skipObjects.size(); j++) {
+                VkDeviceSize offsets[] = { 0 };
+                vkCmdBindVertexBuffers(_commandBuffers[i], 0, 1, &_skipObjects[j]->_vertexBuffer, offsets);
+
+                vkCmdBindIndexBuffer(_commandBuffers[i], _skipObjects[j]->_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                //Bind descriptor sets
+                vkCmdBindDescriptorSets(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1,
+                    &_descriptorSets[j], 0, nullptr);
+
+                vkCmdDrawIndexed(_commandBuffers[i], _skipObjects[j]->_indices.size(), 1, 0, 0, 0);
+
+                
             }
-
-            VkDeviceSize offsets[] = {  0 };
-            vkCmdBindVertexBuffers(_commandBuffers[i], 0, 1, vertexBuffers.data(), offsets);
-
-            vkCmdBindIndexBuffer(_commandBuffers[i], *indexBuffers.data(), 0, VK_INDEX_TYPE_UINT32);
-
-            //Bind descriptor sets
-            vkCmdBindDescriptorSets(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1,
-                &_descriptorSets[i], 0, nullptr);
-
-            //vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
-            // 1 number of instance, offset into index buffer, offset to add to indices in the buffer, offset for instancing
-            vkCmdDrawIndexed(_commandBuffers[i], indicesSize, 1, 0, 0, 0);
-
             vkCmdEndRenderPass(_commandBuffers[i]);
-            if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to record command buffer!");
-            }
+                if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
+                    throw std::runtime_error("Failed to record command buffer!");
+                }
         }
     }
 
