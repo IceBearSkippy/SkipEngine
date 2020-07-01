@@ -22,25 +22,25 @@ int main()
 	// create components
 	camera = new Skip::Camera(glm::vec3(2.0f, 2.0f, 2.0f));
 
+	std::vector<Skip::SkipObject*> skipObjects;
+
 	Skip::ModelObject* modelObject = new Skip::ModelObject(
 		glm::vec3(0.0f, 0.0f, 0.0f),
 		"resources/textures/viking_room.png",
 		"resources/models/viking_room.obj"
 	);
-	std::vector<Skip::SkipObject*> skipObjects;
 	skipObjects.push_back(modelObject);
-
+	Skip::ModelObject* test = new Skip::ModelObject(
+		glm::vec3(2.0f, 1.0f, 0.0f)
+	);
+	skipObjects.push_back(test);
 
 	// create window
 	// Window will create keys to events based on components
 	window = new Skip::VulkanWindow(camera);
 	window->init();
 
-	
-
 	vulkanManager = new Skip::VulkanManager(window, skipObjects, enableValidationLayers);
-	//setup validation layers
-	
 	swapchain = vulkanManager->_vulkanSwapchain;
 
 	uint32_t currentImage;
@@ -56,12 +56,16 @@ int main()
 
 		window->processKeys(deltaTime);
 
-		Skip::UniformBufferObject ubo{};
-		ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-		//ubo.view = glm::lookAt(camera->GetUp(), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		ubo.view = camera->GetViewMatrix();
-
-		swapchain->updateUniformBuffer(ubo, currentImage);
+		modelObject->_ubo.model = Skip::buildRotateX(glm::radians(90.0f));
+		modelObject->_ubo.view = camera->GetViewMatrix();
+		modelObject->_ubo.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
+		modelObject->_ubo.proj[1][1] *= -1;
+		test->_ubo.model = test->GetPositionMatrix() * Skip::buildScale(0.2f, 0.2f, 0.4f);
+		test->_ubo.view = camera->GetViewMatrix();
+		test->_ubo.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
+		test->_ubo.proj[1][1] *= -1;
+		
+		swapchain->updateUniformBuffers(currentImage);
 
 		vulkanManager->drawFrame(currentImage);
 	}
