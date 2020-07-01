@@ -164,8 +164,6 @@ namespace Skip {
         }
     }
 
-    
-
 
     // recreateSwapChain is called when we draw frames
     void VulkanSwapchain::recreateSwapChain() {
