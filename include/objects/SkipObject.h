@@ -53,8 +53,10 @@ namespace Skip {
         ~SkipObject();
         virtual void loadModel() = 0;
 
+        glm::mat4 GetPositionMatrix();
+
         glm::vec3 _position;
-        
+
         std::string _texturePath;
         VkImage _textureImage;
         VkDeviceMemory _textureImageMemory;
@@ -77,5 +79,14 @@ namespace Skip {
     private:
 
     };
+
+    float toRadians(float degrees);
+    glm::mat4 buildCameraLocation(glm::vec3 camera, glm::vec3 uComp, glm::vec3 vComp, glm::vec3 nComp);
+
+    glm::mat4 buildTranslate(float x, float y, float z);
+    glm::mat4 buildRotateX(float rad);
+    glm::mat4 buildRotateY(float rad);
+    glm::mat4 buildRotateZ(float rad);
+    glm::mat4 buildScale(float x, float y, float z);
 }
 

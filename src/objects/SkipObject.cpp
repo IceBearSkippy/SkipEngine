@@ -6,9 +6,14 @@ namespace Skip {
     SkipObject::SkipObject(glm::vec3 position, std::string texturePath ) {
         _position = position;
         _texturePath = texturePath;
+        _ubo.model = GetPositionMatrix();
     }
 	SkipObject::~SkipObject() {
 	}
+
+    glm::mat4 SkipObject::GetPositionMatrix() {
+        return buildTranslate(_position.x, _position.y, _position.z);
+    }
 
     VkVertexInputBindingDescription Vertex::getBindingDescription() {
         // manage attribute binding per vertex
@@ -41,5 +46,71 @@ namespace Skip {
         return attributeDescriptions;
     }
 
+
+    float toRadians(float degrees) {
+        return (degrees * 2.0f * 3.14159f) / 360.0f;
+    }
+
+    glm::mat4 buildCameraLocation(glm::vec3 camera, glm::vec3 uComp, glm::vec3 vComp, glm::vec3 nComp) {
+        glm::mat4 rotMat = glm::mat4(
+            uComp.x, uComp.y, uComp.z, 0.0,
+            vComp.x, vComp.y, vComp.z, 0.0,
+            nComp.x, nComp.y, nComp.z, 0.0,
+            0.0, 0.0, 0.0, 1.0
+        );
+
+        glm::mat4 camMat = buildTranslate(camera.x, camera.y, camera.z);
+        return camMat * rotMat;
+    }
+
+    glm::mat4 buildTranslate(float x, float y, float z) {
+        glm::mat4 trans = glm::mat4(
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            x, y, z, 1.0
+        );
+        return trans;
+    }
+
+    glm::mat4 buildRotateX(float rad) {
+        glm::mat4 xrot = glm::mat4(
+            1.0, 0.0, 0.0, 0.0,
+            0.0, cos(rad), -sin(rad), 0.0,
+            0.0, sin(rad), cos(rad), 0.0,
+            0.0, 0.0, 0.0, 1.0
+        );
+        return xrot;
+    }
+
+    glm::mat4 buildRotateY(float rad) {
+        glm::mat4 yrot = glm::mat4(
+            cos(rad), 0.0, sin(rad), 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            -sin(rad), 0.0, cos(rad), 0.0,
+            0.0, 0.0, 0.0, 1.0
+        );
+        return yrot;
+    }
+
+    glm::mat4 buildRotateZ(float rad) {
+        glm::mat4 zrot = glm::mat4(
+            cos(rad), -sin(rad), 0.0, 0.0,
+            sin(rad), cos(rad), 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0
+        );
+        return zrot;
+    }
+
+    glm::mat4 buildScale(float x, float y, float z) {
+        glm::mat4 scale = glm::mat4(
+            x, 0.0, 0.0, 0.0,
+            0.0, y, 0.0, 0.0,
+            0.0, 0.0, z, 0.0,
+            0.0, 0.0, 0.0, 1.0
+        );
+        return scale;
+    }
 }
 
