@@ -18,13 +18,14 @@ const uint32_t ENGINE_API_VERSION = VK_API_VERSION_1_2;
 namespace Skip {
 
 	class VulkanWindow;
+	
+	class SkipObject;
 
 	struct QueueFamilyIndices;
 	struct GPUInfo;
 	struct Queues;
 
 	struct SwapchainDetails;
-	struct ModelObject;
 	
 	struct UniformBufferObject;
 
@@ -34,10 +35,9 @@ namespace Skip {
 
 	class VulkanManager {
 	public:
-		VulkanManager(VulkanWindow* window);
+		VulkanManager(VulkanWindow* window, std::vector<SkipObject*> skipObjects, bool enableValidationLayers);
 		~VulkanManager();
 
-		void init();
 		bool checkValidationLayerSupport();
 
 		void drawFrame(uint32_t currentImage);

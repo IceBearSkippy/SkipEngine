@@ -8,8 +8,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-
-
 #include <vulkan/vulkan.h>
 #include <array>
 #include <fstream>
@@ -18,79 +16,25 @@
 
 #include <VulkanDevice.h>
 #include <VulkanWindow.h>
-
+#include <objects/SkipObject.h>
 namespace Skip {
-	struct Vertex {
-		glm::vec3 pos;
-		glm::vec3 color;
-		glm::vec2 texCoord;
-
-		static VkVertexInputBindingDescription getBindingDescription();
-		static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();
-		bool operator==(const Vertex& other) const {
-			return pos == other.pos && color == other.color && texCoord == other.texCoord;
-		}
-	};
-
-	//UBO
-	struct UniformBufferObject {
-		alignas(16) glm::mat4 model;
-		alignas(16) glm::mat4 view;
-		alignas(16) glm::mat4 proj;
-	};
 
 	struct SwapchainDetails {
 		VkSurfaceCapabilitiesKHR capabilities;
 		std::vector<VkSurfaceFormatKHR> formats;
 		std::vector<VkPresentModeKHR> presentModes;
 	};
-}
-
-namespace std {
-	template<> struct hash<Skip::Vertex> {
-		size_t operator()(Skip::Vertex const& vertex) const {
-			return ((hash<glm::vec3>()(vertex.pos) ^
-				(hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
-				(hash<glm::vec2>()(vertex.texCoord) << 1);
-		}
-	};
-}
-
-
-namespace Skip {
-	
-	// this will only support simple uv mapping
-	struct ModelObject {
-		std::string texturePath;
-		std::string modelPath;
-		VkImage textureImage;
-		VkDeviceMemory textureImageMemory;
-		VkImageView textureImageView;
-		VkSampler textureSampler;
-		uint32_t mipLevels;
-
-		std::vector<Vertex> vertices;
-		std::unordered_map<Vertex, uint32_t> uniqueVertices;
-		std::vector<uint32_t> indices;
-
-		VkBuffer vertexBuffer;
-		VkDeviceMemory vertexBufferMemory;
-
-		VkBuffer indexBuffer;
-		VkDeviceMemory indexBufferMemory;
-	};
 
 	class VulkanSwapchain {
 
 	public:
 		VulkanSwapchain();
-		VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<ModelObject> modelObjects);
+		VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<SkipObject*> skipObjects);
 		~VulkanSwapchain();
 
 		VulkanDevice* _vkDevice = nullptr;
 		VulkanWindow* _vkWindow = nullptr;
 
-		
 
 		VkSwapchainKHR _swapChain;
 		std::vector<VkImage> _swapChainImages;
@@ -109,11 +53,8 @@ namespace Skip {
 		VkDeviceMemory _depthImageMemory;
 		VkImageView _depthImageView;
 		std::vector<VkFramebuffer> _swapChainFramebuffers;
-		std::vector<ModelObject>  _modelObjects;
+		std::vector<SkipObject*>  _skipObjects;
 		SwapchainDetails querySwapchain();
-
-		std::vector<VkBuffer> _uniformBuffers;
-		std::vector<VkDeviceMemory> _uniformBuffersMemory;
 
 		VkDescriptorPool _descriptorPool;
 		std::vector<VkDescriptorSet> _descriptorSets;
@@ -134,7 +75,7 @@ namespace Skip {
 		bool _framebufferResized = false;
 
 		uint32_t stageFrame();
-		void updateUniformBuffer(UniformBufferObject ubo, uint32_t currentImage);
+		void updateUniformBuffers(uint32_t currentImage);
 		void drawFrame(uint32_t currentImage);
 		void recreateSwapChain();
 		void cleanupSwapChain();

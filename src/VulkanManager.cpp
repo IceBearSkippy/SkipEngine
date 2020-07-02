@@ -3,32 +3,29 @@
 namespace Skip {
 
     
+    std::vector<const char*> DEFAULT_VALIDATION = {
+        "VK_LAYER_KHRONOS_validation"
+    };
 
-	VulkanManager::VulkanManager(VulkanWindow* window) {
+	VulkanManager::VulkanManager(VulkanWindow* window, std::vector<SkipObject*> skipObjects, bool enableValidationLayers)
+        : _validationLayers(DEFAULT_VALIDATION){
         _window = window;
-        _enableValidationLayers = false;
+        _enableValidationLayers = enableValidationLayers;
         _instance = VK_NULL_HANDLE;
-	}
-    void VulkanManager::init() {
-        // create vulkan instance and surface
+
         this->createInstance();
         this->setupDebugMessenger();
         this->createSurface();
         this->queryPhysicalDevices();
-        
+
         _vulkanDevice = new VulkanDevice(this->pickPhysicalDevice());
-        
-        // THIS IS TEMPORARY. Let's get it running first
-        ModelObject modelObject;
-        modelObject.modelPath = "resources/models/viking_room.obj";
-        modelObject.texturePath = "resources/textures/viking_room.png";
-        std::vector<ModelObject> modelObjects;
-        modelObjects.push_back(modelObject);
 
         this->createLogicalDevice();
 
-        _vulkanSwapchain = new VulkanSwapchain(_vulkanDevice, _window, modelObjects);
-    }
+        _vulkanSwapchain = new VulkanSwapchain(_vulkanDevice, _window, skipObjects);
+
+
+	}
 
     VulkanManager::~VulkanManager() {
         
