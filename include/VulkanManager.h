@@ -7,6 +7,7 @@
 #include <iostream>
 #include <algorithm>
 #include <set>
+#include <cstring>
 
 #include <VulkanSwapchain.h>
 
@@ -18,7 +19,7 @@ const uint32_t ENGINE_API_VERSION = VK_API_VERSION_1_2;
 namespace Skip {
 
 	class VulkanWindow;
-	
+
 	class SkipObject;
 
 	struct QueueFamilyIndices;
@@ -26,7 +27,7 @@ namespace Skip {
 	struct Queues;
 
 	struct SwapchainDetails;
-	
+
 	struct UniformBufferObject;
 
 	const std::vector<const char*> deviceExtensions = {
@@ -46,7 +47,7 @@ namespace Skip {
 		bool _enableValidationLayers;
 		std::vector<const char*> _validationLayers;
 		std::vector<const char*> getRequiredExtensions();
-		
+
 		VulkanDevice* _vulkanDevice;
 		VulkanSwapchain* _vulkanSwapchain;
 	private:
