@@ -60,8 +60,6 @@ find_library( VULKAN_SDK
   PATHS ${VULKAN_SDK}/lib
 )
 
-message( STATUS "sjkzangwkgnr ${VULKAN_SDK} ")
-
 if( APPLE )
     target_link_libraries( ${APP_NAME} ${VULKAN_SDK}/lib/libvulkan.1.dylib )
 else()
