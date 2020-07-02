@@ -1,6 +1,7 @@
 #pragma once
 #include <objects/SkipObject.h>
 #include <tiny_obj_loader.h>
+#include <stdexcept>
 namespace Skip {
 
     class ModelObject : public SkipObject
@@ -18,4 +19,3 @@ namespace Skip {
 
     };
 }
-
