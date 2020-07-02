@@ -1,7 +1,7 @@
 ﻿cmake_minimum_required (VERSION 3.16)
 if (UNIX)
-    set( CMAKE_C_COMPILER "gcc")
-    set( CMAKE_CXX_COMPILER "g++")
+    set( CMAKE_C_COMPILER ${CMAKE_C_COMPILER_ID})
+    set( CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER_ID})
 endif()
 
 project ("SkipEngine")
@@ -64,7 +64,7 @@ find_library( VULKAN_SDK
   PATHS ${VULKAN_SDK}/lib
 )
 
-if( APPLE )
+if(APPLE)
     target_link_libraries( ${APP_NAME} ${VULKAN_SDK}/lib/libvulkan.1.dylib )
 else()
     target_link_libraries( ${APP_NAME} ${VULKAN_SDK}/lib/vulkan-1.lib )
