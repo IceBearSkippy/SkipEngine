@@ -1,6 +1,8 @@
 ﻿cmake_minimum_required (VERSION 3.16)
-set( CMAKE_C_COMPILER "gcc")
-set( CMAKE_CXX_COMPILER "g++")
+if (UNIX)
+    set( CMAKE_C_COMPILER "gcc")
+    set( CMAKE_CXX_COMPILER "g++")
+endif()
 
 project ("SkipEngine")
 set( CMAKE_CXX_STANDARD 17 )
@@ -20,8 +22,10 @@ else()
     message( FATAL_ERROR "You must execute `source source-env.sh`" )
 endif()
 
+if (UNIX)
+    find_package( PkgConfig REQUIRED )
+endif()
 
-find_package( PkgConfig REQUIRED )
 find_package( Vulkan REQUIRED )
 find_package( glfw3 REQUIRED )
 find_package( glm REQUIRED )
