@@ -64,7 +64,7 @@ namespace Skip {
             vkDestroySemaphore(logicalDevice, _imageAvailableSemaphores[i], nullptr);
             vkDestroyFence(logicalDevice, _inFlightFences[i], nullptr);
         }
-        
+
         vkDestroyCommandPool(logicalDevice, _commandPool, nullptr);
         vkDestroyDevice(logicalDevice, nullptr);
 	};
@@ -111,7 +111,7 @@ namespace Skip {
         submitInfo.pCommandBuffers = &_commandBuffers[currentImage];
 
         // specify which semaphore (renderFinishedSemaphore) to signal
-        // once the command buffer has finished executing 
+        // once the command buffer has finished executing
         VkSemaphore signalSemaphores[] = { _renderFinishedSemaphores[_currentFrame] };
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
@@ -155,7 +155,7 @@ namespace Skip {
     }
 
     void VulkanSwapchain::updateUniformBuffers(uint32_t currentImage) {
-        
+
         for (size_t i = 0; i < _skipObjects.size(); i++) {
             void* data;
             vkMapMemory(*_vkDevice->getLogicalDevice(), _skipObjects[i]->_uniformBuffersMemory[currentImage], 0, sizeof(_skipObjects[i]->_ubo), 0, &data);
@@ -190,12 +190,12 @@ namespace Skip {
         this->createDescriptorPool();
         this->createDescriptorSets();
         this->createCommandBuffers();
-        
+
     }
 
     void VulkanSwapchain::cleanupSwapChain() {
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
-        
+
         vkDestroyImageView(logicalDevice, _colorImageView, nullptr);
         vkDestroyImage(logicalDevice, _colorImage, nullptr);
         vkFreeMemory(logicalDevice, _colorImageMemory, nullptr);
@@ -218,7 +218,7 @@ namespace Skip {
             _commandBuffers.data());
         vkDestroyPipeline(logicalDevice, _graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(logicalDevice, _pipelineLayout, nullptr);
-        
+
         vkDestroyRenderPass(logicalDevice, _renderPass, nullptr);
         for (size_t i = 0; i < _swapChainImageViews.size(); i++) {
             vkDestroyImageView(logicalDevice, _swapChainImageViews[i], nullptr);
@@ -277,7 +277,7 @@ namespace Skip {
             int width, height;
             glfwGetFramebufferSize(window, &width, &height);
 
-            VkExtent2D actualExtent = { width, height };
+            VkExtent2D actualExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
             actualExtent.width =
                 std::max(capabilities.minImageExtent.width,
                     std::min(capabilities.maxImageExtent.width,
@@ -510,7 +510,7 @@ namespace Skip {
             throw std::runtime_error("Failed to create render pass!");
         }
     }
-    
+
     void VulkanSwapchain::createDescriptorSetLayout() {
         // Builds the following member variables:
         //     _descriptorSetLayout
@@ -547,13 +547,13 @@ namespace Skip {
         }
     }
 
-    
+
     void VulkanSwapchain::createGraphicsPipeline() {
         //TODO: refactor to compile inline for .vert and .frag as initial setup?
         //      Could also pass in file paths to read into this functions
         //
         // Builds the following member variables:
-        //     _pipelineLayout 
+        //     _pipelineLayout
         //     _graphicsPipeline
 
         auto vertShaderCode = readFile("resources/shaders/vert.spv");
@@ -713,7 +713,7 @@ namespace Skip {
         if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &_pipelineLayout) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create pipeline layout!");
         }
-        
+
         // create Graphics Pipeline
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -1001,7 +1001,7 @@ namespace Skip {
         //
         // Model Objects MUST contain a texture
         // need a default texturePath
-        
+
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         for (size_t i = 0; i < _skipObjects.size(); i++) {
             int texWidth, texHeight, texChannels;
@@ -1271,7 +1271,7 @@ namespace Skip {
     void VulkanSwapchain::createVertexBuffers() {
         // TODO: implement vbo solution.. Do we want a buffer for each modelobject? Or one big buffer?
         // we can try the OpenGL approach here
-        // 
+        //
         // This currently creates buffer and memory buffer in ModelObject
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
@@ -1329,7 +1329,7 @@ namespace Skip {
         VkDeviceMemory stagingBufferMemory;
         for (size_t i = 0; i < _skipObjects.size(); i++) {
             VkDeviceSize bufferSize = sizeof(_skipObjects[i]->_indices[0]) * _skipObjects[i]->_indices.size();
-            
+
             // TRANSFER_SRC - source of transfer
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -1369,7 +1369,7 @@ namespace Skip {
             }
         }
 
-        
+
     }
 
     void VulkanSwapchain::createDescriptorPool() {
@@ -1399,7 +1399,7 @@ namespace Skip {
 
     void VulkanSwapchain::createDescriptorSets() {
         // We'll create descriptor set for each SkipObject
-        
+
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         std::vector<VkDescriptorSetLayout> layouts(_swapChainImages.size(), _descriptorSetLayout);
 
@@ -1463,7 +1463,7 @@ namespace Skip {
         allocInfo.commandPool = _commandPool;
         // levels can be primary or secondary
         // primary - can be submitted to a queue for execution, but not called by other command buffers
-        // secondary - cannot be submitted directly, but can be called from primary command buffers 
+        // secondary - cannot be submitted directly, but can be called from primary command buffers
         //             (useful for common operations from primary command buffers)
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t)_commandBuffers.size();
@@ -1522,7 +1522,7 @@ namespace Skip {
 
             //Basic Drawing Commands
             vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
-            
+
 
 
             for (size_t j = 0; j < _skipObjects.size(); j++) {
@@ -1537,7 +1537,7 @@ namespace Skip {
 
                 vkCmdDrawIndexed(_commandBuffers[i], _skipObjects[j]->_indices.size(), 1, 0, 0, 0);
 
-                
+
             }
             vkCmdEndRenderPass(_commandBuffers[i]);
                 if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
