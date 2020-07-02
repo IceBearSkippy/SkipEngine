@@ -10,7 +10,6 @@
 #include <array>
 #include <vulkan/vulkan.h>
 
-// TODO: Add no_texture.png 
 const std::string DEFAULT_TEXTURE = "resources/defaults/blue_texture.png";
 
 namespace Skip {
@@ -89,4 +88,3 @@ namespace Skip {
     glm::mat4 buildRotateZ(float rad);
     glm::mat4 buildScale(float x, float y, float z);
 }
-
