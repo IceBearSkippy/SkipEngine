@@ -4,12 +4,13 @@ if (UNIX)
     set( CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER_ID})
 endif()
 
-project ("SkipEngineDemo")
+set( APP_NAME SkipEngineDemo )
+
+project( APP_NAME )
 set( CMAKE_CXX_STANDARD 17 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 set( CMAKE_CXX_EXTENSIONS OFF )
 
-set( APP_NAME SkipEngineDemo )
 
 set ( SOURCE_FOLDER ./src )
 set ( INCLUDE_FOLDER ./include )
