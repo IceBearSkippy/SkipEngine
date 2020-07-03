@@ -1,6 +1,6 @@
 ﻿#include <VulkanManager.h>
 #include <objects/SkipObject.h>
-#include <objects/ModelObject.h>
+#include <objects/Model.h>
 using namespace std;
 
 Skip::VulkanWindow* window;
@@ -24,13 +24,13 @@ int main()
 
 	std::vector<Skip::SkipObject*> skipObjects;
 
-	Skip::ModelObject* modelObject = new Skip::ModelObject(
+	Skip::Model* modelObject = new Skip::Model(
 		glm::vec3(0.0f, 0.0f, 0.0f),
 		"resources/textures/viking_room.png",
 		"resources/models/viking_room.obj"
 	);
 	skipObjects.push_back(modelObject);
-	Skip::ModelObject* test = new Skip::ModelObject(
+	Skip::Model* test = new Skip::Model(
 		glm::vec3(2.0f, 1.0f, 0.0f)
 	);
 	skipObjects.push_back(test);

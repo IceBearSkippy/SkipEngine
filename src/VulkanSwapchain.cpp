@@ -26,7 +26,7 @@ namespace Skip {
         this->createTextureImages();
         this->createTextureImageViews();
         this->createTextureSamplers();
-        this->loadModels();
+        this->loadObjects();
         this->createVertexBuffers();
         this->createIndexBuffers();
         this->createUniformBuffers();
@@ -1262,9 +1262,9 @@ namespace Skip {
     }
 
 
-    void VulkanSwapchain::loadModels() {
+    void VulkanSwapchain::loadObjects() {
         for (size_t i = 0; i < _skipObjects.size(); i++) {
-            _skipObjects[i]->loadModel();
+            _skipObjects[i]->loadObject();
         }
     }
 

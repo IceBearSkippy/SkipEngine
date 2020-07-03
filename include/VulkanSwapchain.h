@@ -122,7 +122,7 @@ namespace Skip {
 		
 		void createTextureImageViews();
 		void createTextureSamplers();
-		void loadModels();
+		void loadObjects();
 
 		void createVertexBuffers();
 		void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);

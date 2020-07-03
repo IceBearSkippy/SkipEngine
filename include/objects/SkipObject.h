@@ -50,7 +50,7 @@ namespace Skip {
         SkipObject(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE);
 
         ~SkipObject();
-        virtual void loadModel() = 0;
+        virtual void loadObject() = 0;
 
         glm::mat4 GetPositionMatrix();
 

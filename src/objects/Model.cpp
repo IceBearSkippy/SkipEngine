@@ -1,25 +1,25 @@
-#include <objects/ModelObject.h>
+#include <objects/Model.h>
 
 namespace Skip {
 
-    ModelObject::ModelObject()
+    Model::Model()
         : SkipObject(), _modelPath(DEFAULT_MODEL) {
 
     }
 
-    ModelObject::ModelObject(glm::vec3 position, std::string texturePath)
+    Model::Model(glm::vec3 position, std::string texturePath)
         : SkipObject(position, texturePath), _modelPath(DEFAULT_MODEL) {
     }
 
-    ModelObject::ModelObject(glm::vec3 position, std::string texturePath, std::string modelPath)
+    Model::Model(glm::vec3 position, std::string texturePath, std::string modelPath)
         : SkipObject(position, texturePath) {
         _modelPath = modelPath;
     }
 
-    ModelObject::~ModelObject() {
+    Model::~Model() {
     }
 
-    void ModelObject::loadModel() {
+    void Model::loadObject() {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
