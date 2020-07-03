@@ -9,7 +9,7 @@ namespace Skip {
 
     VulkanSwapchain::VulkanSwapchain() {};
 
-	VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<SkipObject*> skipObjects) {
+    VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<SkipObject*> skipObjects) {
         _vkDevice = vkDevice;
         _vkWindow = vkWindow;
         _skipObjects = skipObjects;
@@ -34,9 +34,9 @@ namespace Skip {
         this->createDescriptorSets();
         this->createCommandBuffers();
         this->createSyncObjects();
-	};
+    };
 
-	VulkanSwapchain::~VulkanSwapchain() {
+    VulkanSwapchain::~VulkanSwapchain() {
 
         vkDeviceWaitIdle(*_vkDevice->getLogicalDevice());
 
@@ -67,7 +67,7 @@ namespace Skip {
 
         vkDestroyCommandPool(logicalDevice, _commandPool, nullptr);
         vkDestroyDevice(logicalDevice, nullptr);
-	};
+    };
 
     uint32_t VulkanSwapchain::stageFrame() {
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();

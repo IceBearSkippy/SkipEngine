@@ -7,7 +7,7 @@ namespace Skip {
         "VK_LAYER_KHRONOS_validation"
     };
 
-	VulkanManager::VulkanManager(VulkanWindow* window, std::vector<SkipObject*> skipObjects, bool enableValidationLayers)
+    VulkanManager::VulkanManager(VulkanWindow* window, std::vector<SkipObject*> skipObjects, bool enableValidationLayers)
         : _validationLayers(DEFAULT_VALIDATION){
         _window = window;
         _enableValidationLayers = enableValidationLayers;
@@ -25,7 +25,7 @@ namespace Skip {
         _vulkanSwapchain = new VulkanSwapchain(_vulkanDevice, _window, skipObjects);
 
 
-	}
+    }
 
     VulkanManager::~VulkanManager() {
         
@@ -42,7 +42,7 @@ namespace Skip {
             vkDestroyInstance(_instance, nullptr);
         }
         
-	}
+    }
 
     void VulkanManager::drawFrame(uint32_t currentImage) {
         _vulkanSwapchain->drawFrame(currentImage);

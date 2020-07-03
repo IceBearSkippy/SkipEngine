@@ -8,8 +8,8 @@ namespace Skip {
         _texturePath = texturePath;
         _ubo.model = GetPositionMatrix();
     }
-	SkipObject::~SkipObject() {
-	}
+    SkipObject::~SkipObject() {
+    }
 
     glm::mat4 SkipObject::GetPositionMatrix() {
         return buildTranslate(_position.x, _position.y, _position.z);
