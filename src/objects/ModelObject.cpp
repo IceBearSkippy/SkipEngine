@@ -2,9 +2,7 @@
 
 namespace Skip {
 
-    const std::string DEFAULT_MODEL = "resources/defaults/box.obj";
-
-    ModelObject::ModelObject() 
+    ModelObject::ModelObject()
         : SkipObject(), _modelPath(DEFAULT_MODEL) {
 
     }
@@ -46,7 +44,7 @@ namespace Skip {
                     attrib.vertices[3 * index.vertex_index + 2]
                 };
 
-                // obj format assumes coord system where a vertical (y) coordinate of 0 
+                // obj format assumes coord system where a vertical (y) coordinate of 0
                 // means bottom of the image
                 vertex.texCoord = {
                     attrib.texcoords[2 * index.texcoord_index + 0],
@@ -64,4 +62,3 @@ namespace Skip {
     }
 
 }
-

@@ -1,6 +1,10 @@
 #pragma once
 #include <objects/SkipObject.h>
 #include <tiny_obj_loader.h>
+#include <stdexcept>
+
+const std::string DEFAULT_MODEL = "resources/defaults/box.obj";
+
 namespace Skip {
 
     class ModelObject : public SkipObject
@@ -18,4 +22,3 @@ namespace Skip {
 
     };
 }
-
