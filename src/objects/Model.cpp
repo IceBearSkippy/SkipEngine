@@ -36,7 +36,7 @@ namespace Skip {
         //combine all faces in the file into a single model
         for (const auto& shape : shapes) {
             for (const auto& index : shape.mesh.indices) {
-                Vertexs vertex{};
+                Vertex vertex{};
 
                 vertex.pos = {
                     attrib.vertices[3 * index.vertex_index + 0],
@@ -59,6 +59,7 @@ namespace Skip {
                 _indices.push_back(_uniqueVertices[vertex]);
             }
         }
+        
     }
 
 }
