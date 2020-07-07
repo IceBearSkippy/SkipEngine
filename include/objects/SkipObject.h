@@ -18,6 +18,9 @@ namespace Skip {
         glm::vec3 pos;
         glm::vec3 color;
         glm::vec2 texCoord;
+        glm::vec3 normal;
+        glm::vec3 tangent;
+
 
         static VkVertexInputBindingDescription getBindingDescription();
         static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();
