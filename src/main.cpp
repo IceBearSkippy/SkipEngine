@@ -1,6 +1,8 @@
 ﻿#include <VulkanManager.h>
 #include <objects/SkipObject.h>
 #include <objects/Model.h>
+#include <objects/Cube.h>
+#include <objects/Sphere.h>
 using namespace std;
 
 Skip::VulkanWindow* window;
@@ -30,10 +32,15 @@ int main()
         "resources/models/viking_room.obj"
     );
     skipObjects.push_back(modelObject);
-    Skip::Model* test = new Skip::Model(
+    Skip::Cube* cube = new Skip::Cube(
         glm::vec3(2.0f, 1.0f, 0.0f)
     );
-    skipObjects.push_back(test);
+    skipObjects.push_back(cube);
+
+    Skip::Sphere* sphere = new Skip::Sphere(
+        glm::vec3(-2.0f, 1.0f, 0.0f), 12
+    );
+    skipObjects.push_back(sphere);
 
     // create window
     // Window will create keys to events based on components
@@ -60,10 +67,15 @@ int main()
         modelObject->_ubo.view = camera->GetViewMatrix();
         modelObject->_ubo.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
         modelObject->_ubo.proj[1][1] *= -1;
-        test->_ubo.model = test->GetPositionMatrix() * Skip::buildScale(0.2f, 0.2f, 0.4f);
-        test->_ubo.view = camera->GetViewMatrix();
-        test->_ubo.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
-        test->_ubo.proj[1][1] *= -1;
+        cube->_ubo.model = cube->GetPositionMatrix() * Skip::buildScale(0.0001f, 0.2f, 3.0f);
+        cube->_ubo.view = camera->GetViewMatrix();
+        cube->_ubo.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
+        cube->_ubo.proj[1][1] *= -1;
+
+        sphere->_ubo.model = sphere->GetPositionMatrix() * Skip::buildScale(0.2f, 0.2f, 0.2f);
+        sphere->_ubo.view = camera->GetViewMatrix();
+        sphere->_ubo.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
+        sphere->_ubo.proj[1][1] *= -1;
         
         swapchain->updateUniformBuffers(currentImage);
 
