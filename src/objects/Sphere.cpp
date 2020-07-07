@@ -19,38 +19,51 @@ namespace Skip {
     }
 
 	void Sphere::loadObject() {
-		//calculate triangle vertices
-		for (int i = 0; i < _precision; i++) {
-			for (int j = 0; j < _precision; j++) {
+		int numVertices = (_precision + 1) * (_precision + 1);
+		int numIndices = _precision * _precision * 6;
+		for (int i = 0; i < numVertices; i++) {
+			_vertices.push_back(Vertex{});
+		}
+		for (int i = 0; i < numIndices; i++) {
+			_indices.push_back(0);
+		}
+		
+		for (int i = 0; i <= _precision; i++) {
+			for (int j = 0; j <= _precision; j++) {
 				float y = (float)cos(toRadians(180.0f - i * 180.0f / _precision));
 				float x = -(float)cos(toRadians(j * 360.0f / _precision)) * (float)abs(cos(asin(y)));
 				float z = (float)sin(toRadians(j * 360.0f / _precision)) * (float)abs(cos(asin(y)));
 
-				Vertex vertex{};
-				vertex.pos = glm::vec3(x, y, z);
-				vertex.texCoord = glm::vec2(((float)j / _precision), ((float)i / _precision));
-				vertex.normal = glm::vec3(x, y, z);
-				vertex.color = glm::vec3(1.0f, 1.0f, 1.0f);
+				_vertices[i * (_precision + 1) + j].pos = glm::vec3(x, y, z);
+				_vertices[i * (_precision + 1) + j].texCoord = glm::vec2(((float)j / _precision), ((float)i / _precision));
+				_vertices[i * (_precision + 1) + j].normal = glm::vec3(x, y, z);
+				_vertices[i * (_precision + 1) + j].color = glm::vec3(1.0f, 1.0f, 1.0f);
 
 				// calculate tangent vector
 				if (((x == 0) && (y == 1) && (z == 0)) || ((x == 0) && (y == -1) && (z == 0))) {
 					// if north or south pole,
 					// set tangent to -Z axis
-					vertex.tangent = glm::vec3(0.0f, 0.0f, -1.0f);
+					_vertices[i * (_precision + 1) + j].tangent = glm::vec3(0.0f, 0.0f, -1.0f);
 				} else {
 					// otherwise, calculate tangent
-					vertex.tangent = glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(x, y, z));
+					_vertices[i * (_precision + 1) + j].tangent = glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(x, y, z));
 				}
 
-				if (_uniqueVertices.count(vertex) == 0) {
-					_uniqueVertices[vertex] = static_cast<uint32_t>(_vertices.size());
-					_vertices.push_back(vertex);
-				}
-				_indices.push_back(_uniqueVertices[vertex]);
 			}
 		}
 
-
+		//calculate triangle indices
+		for (int i = 0; i < _precision; i++) {
+			for (int j = 0; j < _precision; j++) {
+				_indices[6 * (i * _precision + j) + 0] = i * (_precision + 1) + j;
+				_indices[6 * (i * _precision + j) + 1] = i * (_precision + 1) + j + 1;
+				_indices[6 * (i * _precision + j) + 2] = (i + 1) * (_precision + 1) + j;
+				_indices[6 * (i * _precision + j) + 3] = i * (_precision + 1) + j + 1;
+				_indices[6 * (i * _precision + j) + 4] = (i + 1) * (_precision + 1) + j + 1;
+				_indices[6 * (i * _precision + j) + 5] = (i + 1) * (_precision + 1) + j;
+			}
+		}
+		
 	}
 
 }
