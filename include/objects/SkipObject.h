@@ -50,7 +50,7 @@ namespace Skip {
     class SkipObject
     {
     public:
-        SkipObject(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE);
+        SkipObject(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
 
         ~SkipObject();
         virtual void loadObject() = 0;
@@ -72,6 +72,7 @@ namespace Skip {
         VkBuffer _vertexBuffer;
         VkDeviceMemory _vertexBufferMemory;
 
+        bool _useIndexBuffer;
         VkBuffer _indexBuffer;
         VkDeviceMemory _indexBufferMemory;
 

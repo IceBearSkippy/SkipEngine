@@ -11,8 +11,8 @@ namespace Skip {
     {
     public:
         Model();
-        Model(glm::vec3 position, std::string texturePath = DEFAULT_TEXTURE);
-        Model(glm::vec3 position, std::string texturePath, std::string model_path);
+        Model(glm::vec3 position, std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
+        Model(glm::vec3 position, std::string texturePath, std::string model_path, bool useIndexBuffer = false);
         ~Model();
 
         std::string _modelPath;

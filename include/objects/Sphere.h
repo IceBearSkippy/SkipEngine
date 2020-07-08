@@ -9,7 +9,7 @@ namespace Skip {
     {
     public:
         Sphere();
-        Sphere(glm::vec3 position, int precision = 48, std::string texturePath = DEFAULT_TEXTURE);
+        Sphere(glm::vec3 position, int precision = 48, std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
         ~Sphere();
 
         int _precision;

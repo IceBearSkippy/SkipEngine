@@ -3,9 +3,10 @@
 namespace Skip {
 
 
-    SkipObject::SkipObject(glm::vec3 position, std::string texturePath ) {
+    SkipObject::SkipObject(glm::vec3 position, std::string texturePath, bool useIndexBuffer) {
         _position = position;
         _texturePath = texturePath;
+        _useIndexBuffer = useIndexBuffer;
         _ubo.model = GetPositionMatrix();
     }
     SkipObject::~SkipObject() {

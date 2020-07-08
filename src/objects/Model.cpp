@@ -7,12 +7,12 @@ namespace Skip {
 
     }
 
-    Model::Model(glm::vec3 position, std::string texturePath)
-        : SkipObject(position, texturePath), _modelPath(DEFAULT_MODEL) {
+    Model::Model(glm::vec3 position, std::string texturePath, bool useIndexBuffer)
+        : SkipObject(position, texturePath, useIndexBuffer), _modelPath(DEFAULT_MODEL) {
     }
 
-    Model::Model(glm::vec3 position, std::string texturePath, std::string modelPath)
-        : SkipObject(position, texturePath) {
+    Model::Model(glm::vec3 position, std::string texturePath, std::string modelPath, bool useIndexBuffer)
+        : SkipObject(position, texturePath, useIndexBuffer) {
         _modelPath = modelPath;
     }
 
@@ -37,11 +37,17 @@ namespace Skip {
         for (const auto& shape : shapes) {
             for (const auto& index : shape.mesh.indices) {
                 Vertex vertex{};
-
+                
                 vertex.pos = {
                     attrib.vertices[3 * index.vertex_index + 0],
                     attrib.vertices[3 * index.vertex_index + 1],
                     attrib.vertices[3 * index.vertex_index + 2]
+                };
+
+                vertex.normal = {
+                    attrib.normals[3 * index.normal_index + 0],
+                    attrib.normals[3 * index.normal_index + 1],
+                    attrib.normals[3 * index.normal_index + 2]
                 };
 
                 // obj format assumes coord system where a vertical (y) coordinate of 0
@@ -57,6 +63,8 @@ namespace Skip {
                     _vertices.push_back(vertex);
                 }
                 _indices.push_back(_uniqueVertices[vertex]);
+
+                
             }
         }
         
