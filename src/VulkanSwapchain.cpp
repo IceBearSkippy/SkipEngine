@@ -9,7 +9,7 @@ namespace Skip {
 
     VulkanSwapchain::VulkanSwapchain() {};
 
-	VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<SkipObject*> skipObjects) {
+    VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<SkipObject*> skipObjects) {
         _vkDevice = vkDevice;
         _vkWindow = vkWindow;
         _skipObjects = skipObjects;
@@ -26,7 +26,7 @@ namespace Skip {
         this->createTextureImages();
         this->createTextureImageViews();
         this->createTextureSamplers();
-        this->loadModels();
+        this->loadObjects();
         this->createVertexBuffers();
         this->createIndexBuffers();
         this->createUniformBuffers();
@@ -34,9 +34,9 @@ namespace Skip {
         this->createDescriptorSets();
         this->createCommandBuffers();
         this->createSyncObjects();
-	};
+    };
 
-	VulkanSwapchain::~VulkanSwapchain() {
+    VulkanSwapchain::~VulkanSwapchain() {
 
         vkDeviceWaitIdle(*_vkDevice->getLogicalDevice());
 
@@ -50,9 +50,10 @@ namespace Skip {
             vkDestroyImage(logicalDevice, _skipObjects[i]->_textureImage, nullptr);
             vkFreeMemory(logicalDevice, _skipObjects[i]->_textureImageMemory, nullptr);
 
-            vkDestroyBuffer(logicalDevice, _skipObjects[i]->_indexBuffer, nullptr);
-            vkFreeMemory(logicalDevice, _skipObjects[i]->_indexBufferMemory, nullptr);
-
+            if (_skipObjects[i]->_useIndexBuffer) {
+                vkDestroyBuffer(logicalDevice, _skipObjects[i]->_indexBuffer, nullptr);
+                vkFreeMemory(logicalDevice, _skipObjects[i]->_indexBufferMemory, nullptr);
+            }
             vkDestroyBuffer(logicalDevice, _skipObjects[i]->_vertexBuffer, nullptr);
             vkFreeMemory(logicalDevice, _skipObjects[i]->_vertexBufferMemory, nullptr);
         }
@@ -67,7 +68,7 @@ namespace Skip {
 
         vkDestroyCommandPool(logicalDevice, _commandPool, nullptr);
         vkDestroyDevice(logicalDevice, nullptr);
-	};
+    };
 
     uint32_t VulkanSwapchain::stageFrame() {
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
@@ -1262,16 +1263,13 @@ namespace Skip {
     }
 
 
-    void VulkanSwapchain::loadModels() {
+    void VulkanSwapchain::loadObjects() {
         for (size_t i = 0; i < _skipObjects.size(); i++) {
-            _skipObjects[i]->loadModel();
+            _skipObjects[i]->loadObject();
         }
     }
 
     void VulkanSwapchain::createVertexBuffers() {
-        // TODO: implement vbo solution.. Do we want a buffer for each modelobject? Or one big buffer?
-        // we can try the OpenGL approach here
-        //
         // This currently creates buffer and memory buffer in ModelObject
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
@@ -1279,13 +1277,10 @@ namespace Skip {
         VkDeviceMemory stagingBufferMemory;
         for (size_t i = 0; i < _skipObjects.size(); i++) {
             VkDeviceSize bufferSize = sizeof(_skipObjects[i]->_vertices[0]) * _skipObjects[i]->_vertices.size();
-
             // TRANSFER_SRC - source of transfer
             createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 stagingBuffer, stagingBufferMemory);
-
-
             // filling the vertex buffer by first passing a staging buffer
             // could specify special vaule VK_WHOLE_SIZE to map all memory (3rd param)
             // Caching can be an issue which can be fixed with vkFlushedMappedMemoryRanges
@@ -1303,6 +1298,7 @@ namespace Skip {
 
             vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
             vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
+
         }
     }
 
@@ -1321,37 +1317,38 @@ namespace Skip {
     }
 
     void VulkanSwapchain::createIndexBuffers() {
-        // TODO:
-        // Not all SkipObjects will need to create index buffers, but it is faster for loading
+        // Index buffers are only needed if normals/lightings are not needed as a per vertex
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         for (size_t i = 0; i < _skipObjects.size(); i++) {
-            VkDeviceSize bufferSize = sizeof(_skipObjects[i]->_indices[0]) * _skipObjects[i]->_indices.size();
+            // TODO Add check for if vbo or using indices
+            if (_skipObjects[i]->_useIndexBuffer) {
+                VkDeviceSize bufferSize = sizeof(_skipObjects[i]->_indices[0]) * _skipObjects[i]->_indices.size();
+                // TRANSFER_SRC - source of transfer
+                createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    stagingBuffer, stagingBufferMemory);
 
-            // TRANSFER_SRC - source of transfer
-            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                stagingBuffer, stagingBufferMemory);
+                // filling the vertex buffer by first passing a staging buffer
+                // could specify special vaule VK_WHOLE_SIZE to map all memory (3rd param)
+                // Caching can be an issue which can be fixed with vkFlushedMappedMemoryRanges
+                // after writing to mapped memory or use a memory heap that is host coherent
+                void* data;
+                vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+                memcpy(data, _skipObjects[i]->_indices.data(), (size_t)bufferSize);
+                vkUnmapMemory(logicalDevice, stagingBufferMemory);
 
-            // filling the vertex buffer by first passing a staging buffer
-            // could specify special vaule VK_WHOLE_SIZE to map all memory (3rd param)
-            // Caching can be an issue which can be fixed with vkFlushedMappedMemoryRanges
-            // after writing to mapped memory or use a memory heap that is host coherent
-            void* data;
-            vkMapMemory(logicalDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
-            memcpy(data, _skipObjects[i]->_indices.data(), (size_t)bufferSize);
-            vkUnmapMemory(logicalDevice, stagingBufferMemory);
+                // TRANSFER_DST - transfer destination
+                createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _skipObjects[i]->_indexBuffer, _skipObjects[i]->_indexBufferMemory);
 
-            // TRANSFER_DST - transfer destination
-            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _skipObjects[i]->_indexBuffer, _skipObjects[i]->_indexBufferMemory);
+                copyBuffer(stagingBuffer, _skipObjects[i]->_indexBuffer, bufferSize);
 
-            copyBuffer(stagingBuffer, _skipObjects[i]->_indexBuffer, bufferSize);
-
-            vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
-            vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
+                vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
+                vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
+            } 
         }
     }
 
@@ -1527,22 +1524,27 @@ namespace Skip {
 
             for (size_t j = 0; j < _skipObjects.size(); j++) {
                 VkDeviceSize offsets[] = { 0 };
+                
                 vkCmdBindVertexBuffers(_commandBuffers[i], 0, 1, &_skipObjects[j]->_vertexBuffer, offsets);
 
-                vkCmdBindIndexBuffer(_commandBuffers[i], _skipObjects[j]->_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                if (_skipObjects[j]->_useIndexBuffer) {
+                    vkCmdBindIndexBuffer(_commandBuffers[i], _skipObjects[j]->_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdBindDescriptorSets(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1,
+                        &_descriptorSets[j], 0, nullptr);
 
-                //Bind descriptor sets
-                vkCmdBindDescriptorSets(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1,
-                    &_descriptorSets[j], 0, nullptr);
-
-                vkCmdDrawIndexed(_commandBuffers[i], _skipObjects[j]->_indices.size(), 1, 0, 0, 0);
+                    vkCmdDrawIndexed(_commandBuffers[i], _skipObjects[j]->_indices.size(), 1, 0, 0, 0);
+                } else {
+                    vkCmdBindDescriptorSets(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1,
+                        &_descriptorSets[j], 0, nullptr);
+                    vkCmdDraw(_commandBuffers[i], _skipObjects[j]->_vertices.size(), 1, 0, 0);
+                }
 
 
             }
             vkCmdEndRenderPass(_commandBuffers[i]);
-                if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
-                    throw std::runtime_error("Failed to record command buffer!");
-                }
+            if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to record command buffer!");
+            }
         }
     }
 

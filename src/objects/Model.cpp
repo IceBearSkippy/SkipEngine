@@ -1,25 +1,25 @@
-#include <objects/ModelObject.h>
+#include <objects/Model.h>
 
 namespace Skip {
 
-    ModelObject::ModelObject()
+    Model::Model()
         : SkipObject(), _modelPath(DEFAULT_MODEL) {
 
     }
 
-    ModelObject::ModelObject(glm::vec3 position, std::string texturePath)
-        : SkipObject(position, texturePath), _modelPath(DEFAULT_MODEL) {
+    Model::Model(glm::vec3 position, std::string texturePath, bool useIndexBuffer)
+        : SkipObject(position, texturePath, useIndexBuffer), _modelPath(DEFAULT_MODEL) {
     }
 
-    ModelObject::ModelObject(glm::vec3 position, std::string texturePath, std::string modelPath)
-        : SkipObject(position, texturePath) {
+    Model::Model(glm::vec3 position, std::string texturePath, std::string modelPath, bool useIndexBuffer)
+        : SkipObject(position, texturePath, useIndexBuffer) {
         _modelPath = modelPath;
     }
 
-    ModelObject::~ModelObject() {
+    Model::~Model() {
     }
 
-    void ModelObject::loadModel() {
+    void Model::loadObject() {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
@@ -37,11 +37,17 @@ namespace Skip {
         for (const auto& shape : shapes) {
             for (const auto& index : shape.mesh.indices) {
                 Vertex vertex{};
-
+                
                 vertex.pos = {
                     attrib.vertices[3 * index.vertex_index + 0],
                     attrib.vertices[3 * index.vertex_index + 1],
                     attrib.vertices[3 * index.vertex_index + 2]
+                };
+
+                vertex.normal = {
+                    attrib.normals[3 * index.normal_index + 0],
+                    attrib.normals[3 * index.normal_index + 1],
+                    attrib.normals[3 * index.normal_index + 2]
                 };
 
                 // obj format assumes coord system where a vertical (y) coordinate of 0
@@ -52,13 +58,20 @@ namespace Skip {
                 };
 
                 vertex.color = { 1.0f, 1.0f, 1.0f };
-                if (_uniqueVertices.count(vertex) == 0) {
-                    _uniqueVertices[vertex] = static_cast<uint32_t>(_vertices.size());
+                if (_useIndexBuffer) {
+                    if (_uniqueVertices.count(vertex) == 0) {
+                        _uniqueVertices[vertex] = static_cast<uint32_t>(_vertices.size());
+                        _vertices.push_back(vertex);
+                    }
+                    _indices.push_back(_uniqueVertices[vertex]);
+                } else {
                     _vertices.push_back(vertex);
                 }
-                _indices.push_back(_uniqueVertices[vertex]);
+
+                
             }
         }
+        
     }
 
 }

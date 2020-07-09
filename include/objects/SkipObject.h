@@ -18,6 +18,9 @@ namespace Skip {
         glm::vec3 pos;
         glm::vec3 color;
         glm::vec2 texCoord;
+        glm::vec3 normal;
+        glm::vec3 tangent;
+
 
         static VkVertexInputBindingDescription getBindingDescription();
         static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();
@@ -47,10 +50,10 @@ namespace Skip {
     class SkipObject
     {
     public:
-        SkipObject(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE);
+        SkipObject(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
 
         ~SkipObject();
-        virtual void loadModel() = 0;
+        virtual void loadObject() = 0;
 
         glm::mat4 GetPositionMatrix();
 
@@ -69,6 +72,7 @@ namespace Skip {
         VkBuffer _vertexBuffer;
         VkDeviceMemory _vertexBufferMemory;
 
+        bool _useIndexBuffer;
         VkBuffer _indexBuffer;
         VkDeviceMemory _indexBufferMemory;
 
