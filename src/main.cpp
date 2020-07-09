@@ -29,16 +29,17 @@ int main()
     Skip::Model* modelObject = new Skip::Model(
         glm::vec3(0.0f, 0.0f, 0.0f),
         "resources/textures/viking_room.png",
-        "resources/models/viking_room.obj"
+        "resources/models/viking_room.obj",
+        true
     );
     skipObjects.push_back(modelObject);
     Skip::Cube* cube = new Skip::Cube(
-        glm::vec3(2.0f, 1.0f, 0.0f)
+        glm::vec3(2.0f, 1.0f, 0.0f), DEFAULT_TEXTURE, false
     );
     skipObjects.push_back(cube);
 
     Skip::Sphere* sphere = new Skip::Sphere(
-        glm::vec3(-2.0f, 1.0f, 0.0f), 12
+        glm::vec3(-2.0f, 1.0f, 0.0f), 12, DEFAULT_TEXTURE, false
     );
     skipObjects.push_back(sphere);
 
@@ -67,7 +68,7 @@ int main()
         modelObject->_ubo.view = camera->GetViewMatrix();
         modelObject->_ubo.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
         modelObject->_ubo.proj[1][1] *= -1;
-        cube->_ubo.model = cube->GetPositionMatrix() * Skip::buildScale(0.0001f, 0.2f, 3.0f);
+        cube->_ubo.model = cube->GetPositionMatrix() * Skip::buildScale(0.2f, 0.2f, 0.2f);
         cube->_ubo.view = camera->GetViewMatrix();
         cube->_ubo.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
         cube->_ubo.proj[1][1] *= -1;
