@@ -15,7 +15,7 @@ const std::string DEFAULT_TEXTURE = "resources/defaults/blue_texture.png";
 namespace Skip {
 
     struct Vertex {
-        glm::vec3 pos;
+        glm::vec3 position;
         glm::vec3 color;
         glm::vec2 texCoord;
         glm::vec3 normal;
@@ -23,17 +23,19 @@ namespace Skip {
 
 
         static VkVertexInputBindingDescription getBindingDescription();
-        static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions();
+        static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions();
         bool operator==(const Vertex& other) const {
-            return pos == other.pos && color == other.color && texCoord == other.texCoord;
+            return position == other.position && color == other.color && texCoord == other.texCoord
+                && normal == other.normal; // normal might not be needed (?)
         }
     };
+
 }
 
 namespace std {
     template<> struct hash<Skip::Vertex> {
         size_t operator()(Skip::Vertex const& vertex) const {
-            return ((hash<glm::vec3>()(vertex.pos) ^
+            return ((hash<glm::vec3>()(vertex.position) ^
                 (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
                 (hash<glm::vec2>()(vertex.texCoord) << 1);
         }
@@ -41,10 +43,17 @@ namespace std {
 }
 
 namespace Skip {
-    struct UniformBufferObject {
+    struct MvpBufferObject {
         alignas(16) glm::mat4 model;
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
+    };
+
+    struct LightBufferObject {
+        alignas(16) glm::vec4 ambient;
+        alignas(16) glm::vec4 diffuse;
+        alignas(16) glm::vec4 specular;
+        alignas(16) glm::vec3 position;
     };
 
     class SkipObject
@@ -76,7 +85,9 @@ namespace Skip {
         VkBuffer _indexBuffer;
         VkDeviceMemory _indexBufferMemory;
 
-        UniformBufferObject _ubo{};
+        MvpBufferObject _mvpUBO{};
+        LightBufferObject _lightUBO{};
+
         std::vector<VkBuffer> _uniformBuffers;
         std::vector<VkDeviceMemory> _uniformBuffersMemory;
     private:
