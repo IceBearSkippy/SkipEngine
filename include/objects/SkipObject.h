@@ -23,7 +23,7 @@ namespace Skip {
 
 
         static VkVertexInputBindingDescription getBindingDescription();
-        static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions();
+        static std::array<VkVertexInputAttributeDescription, 5> getAttributeDescriptions();
         bool operator==(const Vertex& other) const {
             return position == other.position && color == other.color && texCoord == other.texCoord
                 && normal == other.normal; // normal might not be needed (?)
