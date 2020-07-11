@@ -159,11 +159,15 @@ namespace Skip {
 
         for (size_t i = 0; i < _skipObjects.size(); i++) {
             void* data;
-            vkMapMemory(*_vkDevice->getLogicalDevice(), _skipObjects[i]->_uniformBuffersMemory[currentImage], 0,
-                sizeof(_skipObjects[i]->_mvpUBO) + sizeof(_skipObjects[i]->_lightUBO), 0, &data);
+            vkMapMemory(*_vkDevice->getLogicalDevice(), _skipObjects[i]->_mvpUboBuffersMemory[currentImage], 0,
+                sizeof(_skipObjects[i]->_mvpUBO), 0, &data);
             memcpy(data, &_skipObjects[i]->_mvpUBO, sizeof(_skipObjects[i]->_mvpUBO));
+            vkUnmapMemory(*_vkDevice->getLogicalDevice(), _skipObjects[i]->_mvpUboBuffersMemory[currentImage]);
+
+            vkMapMemory(*_vkDevice->getLogicalDevice(), _skipObjects[i]->_lightUboBuffersMemory[currentImage], 0,
+                sizeof(_skipObjects[i]->_lightUBO), 0, &data);
             memcpy(data, &_skipObjects[i]->_lightUBO, sizeof(_skipObjects[i]->_lightUBO));
-            vkUnmapMemory(*_vkDevice->getLogicalDevice(), _skipObjects[i]->_uniformBuffersMemory[currentImage]);
+            vkUnmapMemory(*_vkDevice->getLogicalDevice(), _skipObjects[i]->_lightUboBuffersMemory[currentImage]);
         }
     }
 
@@ -212,8 +216,11 @@ namespace Skip {
         }
         for (size_t i = 0; i < _skipObjects.size(); i++) {
             for (size_t j = 0; j < _swapChainImages.size(); j++) {
-                vkDestroyBuffer(logicalDevice, _skipObjects[i]->_uniformBuffers[j], nullptr);
-                vkFreeMemory(logicalDevice, _skipObjects[i]->_uniformBuffersMemory[j], nullptr);
+                vkDestroyBuffer(logicalDevice, _skipObjects[i]->_mvpUboBuffers[j], nullptr);
+                vkFreeMemory(logicalDevice, _skipObjects[i]->_mvpUboBuffersMemory[j], nullptr);
+
+                vkDestroyBuffer(logicalDevice, _skipObjects[i]->_lightUboBuffers[j], nullptr);
+                vkFreeMemory(logicalDevice, _skipObjects[i]->_lightUboBuffersMemory[j], nullptr);
             }
         }
         vkDestroyDescriptorPool(logicalDevice, _descriptorPool, nullptr);
@@ -542,7 +549,7 @@ namespace Skip {
         lightLayoutBinding.binding = 2;
         lightLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         lightLayoutBinding.descriptorCount = 1;
-        lightLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        lightLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         lightLayoutBinding.pImmutableSamplers = nullptr;
 
         std::array<VkDescriptorSetLayoutBinding, 3> bindings = { mvpLayoutBinding, samplerLayoutBinding, lightLayoutBinding };
@@ -1362,16 +1369,26 @@ namespace Skip {
     }
 
     void VulkanSwapchain::createUniformBuffers() {
-        VkDeviceSize bufferSize = sizeof(MvpBufferObject);
+        // Currently using one buffer for each skip object
+        VkDeviceSize mvpbufferSize = sizeof(MvpBufferObject);
+        VkDeviceSize lightBufferSize = sizeof(LightBufferObject);
         for (size_t i = 0; i < _skipObjects.size(); i++) {
-            _skipObjects[i]->_uniformBuffers.resize(_swapChainImages.size());
-            _skipObjects[i]->_uniformBuffersMemory.resize(_swapChainImages.size());
+            _skipObjects[i]->_mvpUboBuffers.resize(_swapChainImages.size());
+            _skipObjects[i]->_mvpUboBuffersMemory.resize(_swapChainImages.size());
+
+            _skipObjects[i]->_lightUboBuffers.resize(_swapChainImages.size());
+            _skipObjects[i]->_lightUboBuffersMemory.resize(_swapChainImages.size());
 
             for (size_t j = 0; j < _swapChainImages.size(); j++) {
-                createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                createBuffer(mvpbufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, _skipObjects[i]->_uniformBuffers[j],
-                    _skipObjects[i]->_uniformBuffersMemory[j]);
+                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, _skipObjects[i]->_mvpUboBuffers[j],
+                    _skipObjects[i]->_mvpUboBuffersMemory[j]);
+
+                createBuffer(lightBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, _skipObjects[i]->_lightUboBuffers[j],
+                    _skipObjects[i]->_lightUboBuffersMemory[j]);
             }
         }
 
@@ -1380,14 +1397,18 @@ namespace Skip {
 
     void VulkanSwapchain::createDescriptorPool() {
         // describe descriptor types our sets are going to contain
-        // Create pools for ubo and sampler
-        std::array<VkDescriptorPoolSize, 2> poolSizes{};
+        // Create pools for each ubos and sampler
+        std::array<VkDescriptorPoolSize, 3> poolSizes{};
 
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(_swapChainImages.size());
 
         poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         poolSizes[1].descriptorCount = static_cast<uint32_t>(_swapChainImages.size());
+
+        poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[2].descriptorCount = static_cast<uint32_t>(_swapChainImages.size());
+
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1423,11 +1444,12 @@ namespace Skip {
         // descriptor sets need to be configured for each buffer
         for (size_t i = 0; i < _skipObjects.size(); i++) {
 
-            // TODO FIX OFFSETS
+            // TODO FIX multiple structs into one buffer --> must deal with size/writes being aligned (minUboAlignment)
+            // https://stackoverflow.com/questions/55426448/how-do-i-load-multiple-structs-into-a-single-ubo
             VkDescriptorBufferInfo mvpBufferInfo{};
-            mvpBufferInfo.buffer = *_skipObjects[i]->_uniformBuffers.data();
+            mvpBufferInfo.buffer = *_skipObjects[i]->_mvpUboBuffers.data();
             mvpBufferInfo.offset = 0;
-            mvpBufferInfo.range = sizeof(_skipObjects[i]->_uniformBuffers);
+            mvpBufferInfo.range = sizeof(_skipObjects[i]->_mvpUboBuffers);
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1435,9 +1457,9 @@ namespace Skip {
             imageInfo.sampler = _skipObjects[i]->_textureSampler;
 
             VkDescriptorBufferInfo lightBufferInfo{};
-            lightBufferInfo.buffer = *_skipObjects[i]->_uniformBuffers.data();
-            lightBufferInfo.offset = 0; // provide offset -- first bit of uniformBuffers is taken by _mvpUBO
-            lightBufferInfo.range = sizeof(_skipObjects[i]->_uniformBuffers);
+            lightBufferInfo.buffer = *_skipObjects[i]->_lightUboBuffers.data();
+            lightBufferInfo.offset = 0;
+            lightBufferInfo.range = sizeof(_skipObjects[i]->_lightUboBuffers);
 
             std::array<VkWriteDescriptorSet, 3> descriptorWrites{};
             descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

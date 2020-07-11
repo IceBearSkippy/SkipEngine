@@ -88,8 +88,11 @@ namespace Skip {
         MvpBufferObject _mvpUBO{};
         LightBufferObject _lightUBO{};
 
-        std::vector<VkBuffer> _uniformBuffers;
-        std::vector<VkDeviceMemory> _uniformBuffersMemory;
+        std::vector<VkBuffer> _mvpUboBuffers;
+        std::vector<VkDeviceMemory> _mvpUboBuffersMemory;
+
+        std::vector<VkBuffer> _lightUboBuffers;
+        std::vector<VkDeviceMemory> _lightUboBuffersMemory;
     private:
 
     };

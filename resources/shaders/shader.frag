@@ -22,5 +22,4 @@ void main() {
 	vec4 texel = texture(texSampler, fragTexCoord);
 	vec4 lightedColor = texel * posLight.diffuse * posLight.specular;
 	outColor = vec4(lightedColor.xyz, 1.0);
-	//outColor = vec4(fragColor * texture(texSampler, fragTexCoord).rgb, 1.0);
 }

@@ -27,7 +27,6 @@ layout(location = 3) out vec3 varyingVertPos;   // vertex position in eye space
 
 void main() {
 	mat4 mvMatrix = mvp.view * mvp.model;
-
 	varyingVertPos = (mvMatrix * vec4(vertPosition, 1.0)).xyz;
 	varyingLightDir = posLight.position - varyingVertPos;
 
