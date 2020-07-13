@@ -185,7 +185,6 @@ namespace Skip {
         vkDeviceWaitIdle(*_vkDevice->getLogicalDevice());
 
         this->cleanupSwapChain();
-
         this->createSwapChain();
         this->createImageViews();
         this->createRenderPass();
@@ -1280,8 +1279,9 @@ namespace Skip {
 
 
     void VulkanSwapchain::loadObjects() {
+        float aspect = _swapChainExtent.width / (float)_swapChainExtent.height;
         for (size_t i = 0; i < _skipObjects.size(); i++) {
-            _skipObjects[i]->loadObject();
+            _skipObjects[i]->loadObject(aspect);
         }
     }
 
@@ -1444,8 +1444,6 @@ namespace Skip {
         // descriptor sets need to be configured for each buffer
         for (size_t i = 0; i < _skipObjects.size(); i++) {
 
-            // TODO FIX multiple structs into one buffer --> must deal with size/writes being aligned (minUboAlignment)
-            // https://stackoverflow.com/questions/55426448/how-do-i-load-multiple-structs-into-a-single-ubo
             VkDescriptorBufferInfo mvpBufferInfo{};
             mvpBufferInfo.buffer = *_skipObjects[i]->_mvpUboBuffers.data();
             mvpBufferInfo.offset = 0;

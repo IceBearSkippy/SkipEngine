@@ -18,7 +18,7 @@ namespace Skip {
     Sphere::~Sphere() {
     }
 
-	void Sphere::loadObject() {
+	void Sphere::loadObject(float aspect) {
 		int numVertices = (_precision + 1) * (_precision + 1);
 		int numIndices = _precision * _precision * 6;
 		std::vector<Vertex> temp_vertices;

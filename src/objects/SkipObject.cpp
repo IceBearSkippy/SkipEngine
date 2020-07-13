@@ -7,7 +7,11 @@ namespace Skip {
         _position = position;
         _texturePath = texturePath;
         _useIndexBuffer = useIndexBuffer;
+        _mvpUBO = MvpBufferObject{};
         _mvpUBO.model = GetPositionMatrix();
+        _lightUBO = LightBufferObject{};
+
+
     }
     SkipObject::~SkipObject() {
     }

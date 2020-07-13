@@ -19,7 +19,7 @@ namespace Skip {
     Model::~Model() {
     }
 
-    void Model::loadObject() {
+    void Model::loadObject(float aspect) {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;

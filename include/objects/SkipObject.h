@@ -47,13 +47,35 @@ namespace Skip {
         alignas(16) glm::mat4 model;
         alignas(16) glm::mat4 view;
         alignas(16) glm::mat4 proj;
+        alignas(16) glm::mat4 norm;
     };
 
+    const glm::vec4 DEFAULT_GLOBAL_AMBIENT = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f);
+
+    const glm::vec4 DEFAULT_AMBIENT = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    const glm::vec4 DEFAULT_DIFFUSE = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    const glm::vec4 DEFAULT_SPECULAR = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+
+    const glm::vec4 DEFAULT_MATERIAL_AMBIENT = glm::vec4(0.2125f, 0.1275f, 0.0540f, 1);
+    const glm::vec4 DEFAULT_MATERIAL_DIFFUSE = glm::vec4(0.7140f, 0.4284f, 0.1814f, 1);
+    const glm::vec4 DEFAULT_MATERIAL_SPECULAR = glm::vec4(0.3936f, 0.2719f, 0.1667f, 1);
+    const float DEFAULT_MATERIAL_SHININESS = 25.6f;
+
+    const glm::vec3 DEFAULT_LIGHT_POSITION = glm::vec3(5.0f, -3.0f, 1.0f);
+
     struct LightBufferObject {
-        alignas(16) glm::vec4 ambient;
-        alignas(16) glm::vec4 diffuse;
-        alignas(16) glm::vec4 specular;
-        alignas(16) glm::vec3 position;
+        alignas(16) glm::vec4 globalAmbient = DEFAULT_GLOBAL_AMBIENT;
+
+        alignas(16) glm::vec4 ambient = DEFAULT_AMBIENT;
+        alignas(16) glm::vec4 diffuse = DEFAULT_DIFFUSE;
+        alignas(16) glm::vec4 specular = DEFAULT_SPECULAR;
+
+        alignas(16) glm::vec4 matAmbient = DEFAULT_MATERIAL_AMBIENT;
+        alignas(16) glm::vec4 matDiffuse = DEFAULT_MATERIAL_DIFFUSE;
+        alignas(16) glm::vec4 matSpecular = DEFAULT_MATERIAL_SPECULAR;
+        alignas(4) float matShininess = DEFAULT_MATERIAL_SHININESS;
+
+        alignas(16) glm::vec3 position = DEFAULT_LIGHT_POSITION;
     };
 
     class SkipObject
@@ -62,7 +84,7 @@ namespace Skip {
         SkipObject(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
 
         ~SkipObject();
-        virtual void loadObject() = 0;
+        virtual void loadObject(float aspect) = 0;
 
         glm::mat4 GetPositionMatrix();
 

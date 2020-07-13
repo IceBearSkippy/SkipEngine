@@ -14,7 +14,7 @@ namespace Skip {
     Cube::~Cube() {
     }
 
-    void Cube::loadObject() {
+    void Cube::loadObject(float aspect) {
         for (auto vertex : CUBE_VERTICES) {
             if (_useIndexBuffer) {
                 if (_uniqueVertices.count(vertex) == 0) {

@@ -14,7 +14,7 @@ namespace Skip {
 
         int _precision;
 
-        void loadObject();
+        void loadObject(float aspect);
     private:
 
     };

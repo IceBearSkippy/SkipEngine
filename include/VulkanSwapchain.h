@@ -35,7 +35,6 @@ namespace Skip {
         VulkanDevice* _vkDevice = nullptr;
         VulkanWindow* _vkWindow = nullptr;
 
-
         VkSwapchainKHR _swapChain;
         std::vector<VkImage> _swapChainImages;
         VkFormat _swapChainImageFormat;
