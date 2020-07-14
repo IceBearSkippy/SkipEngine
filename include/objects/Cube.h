@@ -54,13 +54,17 @@ const std::vector<Skip::Vertex> CUBE_VERTICES = {
     Skip::Vertex {glm::vec3(1.0f, 1.0f, -1.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec2(0.625f, 0.50f), glm::vec3(0.0f, 0.0f, -1.0f)},
     Skip::Vertex {glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec2(0.375f, 0.50f), glm::vec3(0.0f, 0.0f, -1.0f)}
 };
+
+const std::string DEFAULT_CUBE_NAME = "CubeSkipObject";
+
 namespace Skip {
 
     class Cube : public SkipObject
     {
     public:
         Cube();
-        Cube(glm::vec3 position, std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
+        Cube(std::string name = DEFAULT_CUBE_NAME, glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
+        Cube(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
         ~Cube();
 
         void loadObject(float aspect);

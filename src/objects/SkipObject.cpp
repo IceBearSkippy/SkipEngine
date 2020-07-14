@@ -3,7 +3,8 @@
 namespace Skip {
 
 
-    SkipObject::SkipObject(glm::vec3 position, std::string texturePath, bool useIndexBuffer) {
+    SkipObject::SkipObject(std::string name, glm::vec3 position, std::string texturePath, bool useIndexBuffer) {
+        _name = name;
         _position = position;
         _texturePath = texturePath;
         _useIndexBuffer = useIndexBuffer;
@@ -13,6 +14,7 @@ namespace Skip {
 
 
     }
+
     SkipObject::~SkipObject() {
     }
 

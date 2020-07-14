@@ -11,7 +11,7 @@
 #include <vulkan/vulkan.h>
 
 const std::string DEFAULT_TEXTURE = "resources/defaults/blue_texture.png";
-
+const std::string DEFAULT_NAME = "SkipObject";
 namespace Skip {
 
     struct Vertex {
@@ -81,10 +81,11 @@ namespace Skip {
     class SkipObject
     {
     public:
-        SkipObject(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
-
+        SkipObject(std::string name = DEFAULT_NAME, glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
         ~SkipObject();
         virtual void loadObject(float aspect) = 0;
+
+        std::string _name;
 
         glm::mat4 GetPositionMatrix();
 

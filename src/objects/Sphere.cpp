@@ -8,9 +8,13 @@ namespace Skip {
         : SkipObject() {
 
     }
+	Sphere::Sphere(glm::vec3 position, int precision, std::string texturePath, bool useIndexBuffer) 
+		: SkipObject(DEFAULT_SPHERE_NAME, position, texturePath, useIndexBuffer) {
+		_precision = precision;
+	}
 
-    Sphere::Sphere(glm::vec3 position, int precision, std::string texturePath, bool useIndexBuffer)
-        : SkipObject(position, texturePath, useIndexBuffer) {
+    Sphere::Sphere(std::string name, glm::vec3 position, int precision, std::string texturePath, bool useIndexBuffer)
+        : SkipObject(name, position, texturePath, useIndexBuffer) {
 		_precision = precision;
 
     }

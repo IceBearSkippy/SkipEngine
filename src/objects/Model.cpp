@@ -7,15 +7,22 @@ namespace Skip {
 
     }
 
-    Model::Model(glm::vec3 position, std::string texturePath, bool useIndexBuffer)
-        : SkipObject(position, texturePath, useIndexBuffer), _modelPath(DEFAULT_MODEL) {
+    Model::Model(std::string name, glm::vec3 position, std::string texturePath, bool useIndexBuffer)
+        : SkipObject(name, position, texturePath, useIndexBuffer), _modelPath(DEFAULT_MODEL) {
     }
+    Model::Model(glm::vec3 position, std::string texturePath, bool useIndexBuffer) 
+        : SkipObject(DEFAULT_MODEL_NAME, position, texturePath, useIndexBuffer) {
 
-    Model::Model(glm::vec3 position, std::string texturePath, std::string modelPath, bool useIndexBuffer)
-        : SkipObject(position, texturePath, useIndexBuffer) {
+    }
+    Model::Model(std::string name, glm::vec3 position, std::string texturePath, std::string modelPath, bool useIndexBuffer)
+        : SkipObject(name, position, texturePath, useIndexBuffer) {
         _modelPath = modelPath;
     }
+    Model::Model(glm::vec3 position, std::string texturePath, std::string modelPath, bool useIndexBuffer)
+        : SkipObject(DEFAULT_MODEL_NAME, position, texturePath, useIndexBuffer) {
+        _modelPath = modelPath;
 
+    }
     Model::~Model() {
     }
 

@@ -7,8 +7,12 @@ namespace Skip {
 
     }
 
+    Cube::Cube(std::string name, glm::vec3 position, std::string texturePath, bool useIndexBuffer)
+        : SkipObject(name, position, texturePath, useIndexBuffer) {
+    }
+
     Cube::Cube(glm::vec3 position, std::string texturePath, bool useIndexBuffer)
-        : SkipObject(position, texturePath, useIndexBuffer) {
+        : SkipObject(DEFAULT_CUBE_NAME, position, texturePath, useIndexBuffer) {
     }
 
     Cube::~Cube() {
