@@ -19,7 +19,7 @@ namespace Skip {
     Model::~Model() {
     }
 
-    void Model::loadObject() {
+    void Model::loadObject(float aspect) {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
         std::vector<tinyobj::material_t> materials;
@@ -38,7 +38,7 @@ namespace Skip {
             for (const auto& index : shape.mesh.indices) {
                 Vertex vertex{};
                 
-                vertex.pos = {
+                vertex.position = {
                     attrib.vertices[3 * index.vertex_index + 0],
                     attrib.vertices[3 * index.vertex_index + 1],
                     attrib.vertices[3 * index.vertex_index + 2]

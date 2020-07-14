@@ -18,7 +18,7 @@ namespace Skip {
     Sphere::~Sphere() {
     }
 
-	void Sphere::loadObject() {
+	void Sphere::loadObject(float aspect) {
 		int numVertices = (_precision + 1) * (_precision + 1);
 		int numIndices = _precision * _precision * 6;
 		std::vector<Vertex> temp_vertices;
@@ -46,7 +46,7 @@ namespace Skip {
 				float x = -(float)cos(toRadians(j * 360.0f / _precision)) * (float)abs(cos(asin(y)));
 				float z = (float)sin(toRadians(j * 360.0f / _precision)) * (float)abs(cos(asin(y)));
 
-				temp_vertices[i * (_precision + 1) + j].pos = glm::vec3(x, y, z);
+				temp_vertices[i * (_precision + 1) + j].position = glm::vec3(x, y, z);
 				temp_vertices[i * (_precision + 1) + j].texCoord = glm::vec2(((float)j / _precision), ((float)i / _precision));
 				temp_vertices[i * (_precision + 1) + j].normal = glm::vec3(x, y, z);
 				temp_vertices[i * (_precision + 1) + j].color = glm::vec3(1.0f, 1.0f, 1.0f);

@@ -63,7 +63,7 @@ namespace Skip {
         Cube(glm::vec3 position, std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
         ~Cube();
 
-        void loadObject();
+        void loadObject(float aspect);
     private:
 
     };

@@ -17,7 +17,7 @@ namespace Skip {
 
         std::string _modelPath;
 
-        void loadObject();
+        void loadObject(float aspect);
     private:
 
     };
