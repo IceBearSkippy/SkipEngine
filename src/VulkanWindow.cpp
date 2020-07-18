@@ -14,20 +14,20 @@ namespace Skip {
         _width = DEFAULT_WINDOW_WIDTH;
         _height = DEFAULT_WINDOW_HEIGHT;
         _title = DEFAULT_WINDOW_NAME;
-        _camera = new Camera(glm::vec3(2.0f, 2.0f, 2.0f));
+        _scene = new SkipScene();
     }
 
-    VulkanWindow::VulkanWindow(Camera* camera) {
+    VulkanWindow::VulkanWindow(SkipScene* scene) {
         _width = DEFAULT_WINDOW_WIDTH;
         _height = DEFAULT_WINDOW_HEIGHT;
         _title = DEFAULT_WINDOW_NAME;
-        _camera = camera;
+        _scene = scene;
     }
-    VulkanWindow::VulkanWindow(uint32_t width, uint32_t height, char* title, Camera* camera) {
+    VulkanWindow::VulkanWindow(uint32_t width, uint32_t height, char* title, SkipScene* scene) {
         _width = width;
         _height = height;
         _title = title;
-        _camera = camera;
+        _scene = scene;
     }
 
     VulkanWindow::~VulkanWindow() {
@@ -61,19 +61,19 @@ namespace Skip {
 
     void VulkanWindow::processKeys(float deltaTime) {
         if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP]) {
-            _camera->ProcessKeyboard(FORWARD, deltaTime);
+            _scene->_camera->ProcessKeyboard(FORWARD, deltaTime);
         }
 
         if (keys[GLFW_KEY_S] || keys[GLFW_KEY_DOWN]) {
-            _camera->ProcessKeyboard(BACKWARD, deltaTime);
+            _scene->_camera->ProcessKeyboard(BACKWARD, deltaTime);
         }
 
         if (keys[GLFW_KEY_A] || keys[GLFW_KEY_LEFT]) {
-            _camera->ProcessKeyboard(LEFT, deltaTime);
+            _scene->_camera->ProcessKeyboard(LEFT, deltaTime);
         }
 
         if (keys[GLFW_KEY_D] || keys[GLFW_KEY_RIGHT]) {
-            _camera->ProcessKeyboard(RIGHT, deltaTime);
+            _scene->_camera->ProcessKeyboard(RIGHT, deltaTime);
         }
     }
 
@@ -94,7 +94,7 @@ namespace Skip {
     void VulkanWindow::MouseCallback(GLFWwindow* window, double xPos, double yPos) {
         VulkanWindow* vulkanWindow =
             static_cast<VulkanWindow*>(glfwGetWindowUserPointer(window));
-        Camera* camera = vulkanWindow->_camera;
+        Camera* camera = vulkanWindow->_scene->_camera;
         if (firstMouse) {
             lastX = xPos;
             lastY = yPos;

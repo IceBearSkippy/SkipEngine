@@ -7,7 +7,7 @@ namespace Skip {
         "VK_LAYER_KHRONOS_validation"
     };
 
-    VulkanManager::VulkanManager(VulkanWindow* window, std::vector<SkipObject*> skipObjects, bool enableValidationLayers)
+    VulkanManager::VulkanManager(VulkanWindow* window, SkipScene* scene, bool enableValidationLayers)
         : _validationLayers(DEFAULT_VALIDATION){
         _window = window;
         _enableValidationLayers = enableValidationLayers;
@@ -22,7 +22,7 @@ namespace Skip {
 
         this->createLogicalDevice();
 
-        _vulkanSwapchain = new VulkanSwapchain(_vulkanDevice, _window, skipObjects);
+        _vulkanSwapchain = new VulkanSwapchain(_vulkanDevice, _window, scene);
 
 
     }

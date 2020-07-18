@@ -8,7 +8,7 @@
 #include <vulkan/vulkan.h>
 #include <string>
 
-#include <Camera.h>
+#include <SkipScene.h>
 
 namespace Skip {
 
@@ -16,8 +16,8 @@ namespace Skip {
         // Manages glfw and VkSurface
     public:
         VulkanWindow();
-        VulkanWindow(Camera *camera);
-        VulkanWindow(uint32_t width, uint32_t height, char* title, Camera *camera);
+        VulkanWindow(SkipScene* scene);
+        VulkanWindow(uint32_t width, uint32_t height, char* title, SkipScene* scene);
         ~VulkanWindow();
         void init();
         bool shouldClose();
@@ -32,7 +32,7 @@ namespace Skip {
         bool _framebufferResized = false;
         GLFWwindow* _glfw = nullptr;
         VkSurfaceKHR _surface = VK_NULL_HANDLE;
-        Camera* _camera = nullptr;
+        SkipScene* _scene = nullptr;
         
     private:
         static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);

@@ -36,7 +36,7 @@ namespace Skip {
 
     class VulkanManager {
     public:
-        VulkanManager(VulkanWindow* window, std::vector<SkipObject*> skipObjects, bool enableValidationLayers);
+        VulkanManager(VulkanWindow* window, SkipScene* scene, bool enableValidationLayers);
         ~VulkanManager();
 
         bool checkValidationLayerSupport();
