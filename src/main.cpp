@@ -8,7 +8,7 @@ using namespace std;
 Skip::VulkanWindow* window;
 Skip::VulkanManager* vulkanManager;
 Skip::VulkanSwapchain* swapchain;
-Skip::Camera* camera;
+Skip::SkipScene* scene;
 
 int main()
 {
@@ -21,8 +21,8 @@ int main()
     // We will interact with Vulkan manager and vulkan window
     // GLFW will live in VulkanWindow and have public access
 
-    // create components
-    camera = new Skip::Camera(glm::vec3(2.0f, 2.0f, 2.0f));
+    // create scene with camera position
+    scene = new Skip::SkipScene(glm::vec3(2.0f, 2.0f, 2.0f));
 
     std::vector<Skip::SkipObject*> skipObjects;
 
@@ -32,23 +32,23 @@ int main()
         "resources/models/viking_room.obj",
         true
     );
-    skipObjects.push_back(modelObject);
+    scene->addObject(modelObject);
     Skip::Cube* cube = new Skip::Cube(
         glm::vec3(2.0f, 1.0f, 0.0f), DEFAULT_TEXTURE, false
     );
-    skipObjects.push_back(cube);
+    scene->addObject(cube);
 
     Skip::Sphere* sphere = new Skip::Sphere(
         glm::vec3(2.0f, 1.5f, 0.0f), 12, DEFAULT_TEXTURE, false
     );
-    skipObjects.push_back(sphere);
+    scene->addObject(sphere);
 
     // create window
     // Window will create keys to events based on components
-    window = new Skip::VulkanWindow(camera);
+    window = new Skip::VulkanWindow(scene);
     window->init();
 
-    vulkanManager = new Skip::VulkanManager(window, skipObjects, enableValidationLayers);
+    vulkanManager = new Skip::VulkanManager(window, scene, enableValidationLayers);
     swapchain = vulkanManager->_vulkanSwapchain;
 
     uint32_t currentImage;
@@ -66,19 +66,19 @@ int main()
         window->processKeys(deltaTime);
 
         modelObject->_mvpUBO.model = Skip::buildRotateX(glm::radians(90.0f));
-        modelObject->_mvpUBO.view = camera->GetViewMatrix();
+        modelObject->_mvpUBO.view = scene->_camera->GetViewMatrix();
         modelObject->_mvpUBO.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
         modelObject->_mvpUBO.proj[1][1] *= -1;
 
         cube->_mvpUBO.model = cube->GetPositionMatrix() * Skip::buildScale(0.2f, 0.2f, 0.2f);
-        cube->_mvpUBO.view = camera->GetViewMatrix();
+        cube->_mvpUBO.view = scene->_camera->GetViewMatrix();
         cube->_mvpUBO.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
         cube->_mvpUBO.proj[1][1] *= -1;
         mvpMat = cube->_mvpUBO.proj * cube->_mvpUBO.view * cube->_mvpUBO.model;
         cube->_mvpUBO.norm = glm::transpose(glm::inverse((mvpMat)));
 
         sphere->_mvpUBO.model = sphere->GetPositionMatrix() * Skip::buildScale(0.2f, 0.2f, 0.2f);
-        sphere->_mvpUBO.view = camera->GetViewMatrix();
+        sphere->_mvpUBO.view = scene->_camera->GetViewMatrix();
         sphere->_mvpUBO.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
         sphere->_mvpUBO.proj[1][1] *= -1;
         sphere->_lightUBO.ambient = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 100.0f;
