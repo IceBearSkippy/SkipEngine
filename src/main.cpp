@@ -33,13 +33,13 @@ int main()
         true
     );
     scene->addObject(modelObject);
-    Skip::Cube* cube = new Skip::Cube(
-        glm::vec3(2.0f, 1.0f, 0.0f), DEFAULT_TEXTURE, false
+    Skip::Sphere* lightSphere = new Skip::Sphere(
+        glm::vec3(2.0f, 1.5f, 0.0f), 12, DEFAULT_TEXTURE, false
     );
-    scene->addObject(cube);
+    scene->addObject(lightSphere);
 
     Skip::Sphere* sphere = new Skip::Sphere(
-        glm::vec3(2.0f, 1.5f, 0.0f), 12, DEFAULT_TEXTURE, false
+        glm::vec3(2.0f, 1.0f, 0.0f), 24, DEFAULT_TEXTURE, false
     );
     scene->addObject(sphere);
 
@@ -54,7 +54,21 @@ int main()
     uint32_t currentImage;
     float currentTime, deltaTime;
     float lastTime = 0.0;
-    glm::mat4 mvpMat;
+    glm::mat4 mvMat;
+
+    lightSphere->_mvpUBO.model = lightSphere->GetPositionMatrix() * Skip::buildScale(0.1f, 0.1f, 0.1f);
+    lightSphere->_lightUBO.globalAmbient *= 100.0f;
+    lightSphere->_lightUBO.ambient = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
+    lightSphere->_lightUBO.diffuse = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
+    lightSphere->_lightUBO.specular = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
+
+
+    sphere->_mvpUBO.model = sphere->GetPositionMatrix() * Skip::buildScale(0.3f, 0.3f, 0.3f);
+    sphere->_lightUBO.ambient = sphere->_lightUBO.ambient * lightSphere->_lightUBO.ambient;
+    sphere->_lightUBO.diffuse = sphere->_lightUBO.diffuse * lightSphere->_lightUBO.diffuse;
+    sphere->_lightUBO.specular = sphere->_lightUBO.specular * lightSphere->_lightUBO.specular;
+
+    modelObject->_mvpUBO.model = Skip::buildRotateX(glm::radians(90.0f));
     while (!window->shouldClose()) {
         glfwPollEvents();
 
@@ -65,25 +79,17 @@ int main()
 
         window->processKeys(deltaTime);
 
-        modelObject->_mvpUBO.model = Skip::buildRotateX(glm::radians(90.0f));
         modelObject->_mvpUBO.view = scene->_camera->GetViewMatrix();
 
-        cube->_mvpUBO.model = cube->GetPositionMatrix() * Skip::buildScale(0.2f, 0.2f, 0.2f);
-        cube->_mvpUBO.view = scene->_camera->GetViewMatrix();
-
-        mvpMat = cube->_mvpUBO.proj * cube->_mvpUBO.view * cube->_mvpUBO.model;
-        cube->_mvpUBO.norm = glm::transpose(glm::inverse((mvpMat)));
-
-        sphere->_mvpUBO.model = sphere->GetPositionMatrix() * Skip::buildScale(0.2f, 0.2f, 0.2f);
-        sphere->_mvpUBO.view = scene->_camera->GetViewMatrix();
-
-        sphere->_lightUBO.ambient = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 100.0f;
-        sphere->_lightUBO.diffuse = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
-        sphere->_lightUBO.specular = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
-
-        mvpMat = sphere->_mvpUBO.proj * sphere->_mvpUBO.view * sphere->_mvpUBO.model;
-        sphere->_mvpUBO.norm = glm::transpose(glm::inverse((mvpMat)));
+        lightSphere->_mvpUBO.view = scene->_camera->GetViewMatrix();
+        mvMat = lightSphere->_mvpUBO.view * lightSphere->_mvpUBO.model;
+        lightSphere->_mvpUBO.norm = glm::transpose(glm::inverse((mvMat)));
         
+        sphere->_mvpUBO.view = scene->_camera->GetViewMatrix();
+        mvMat = lightSphere->_mvpUBO.view * sphere->_mvpUBO.model;
+        sphere->_mvpUBO.norm = glm::transpose(glm::inverse((mvMat)));
+        sphere->_lightUBO.position = lightSphere->_lightUBO.position;
+
         swapchain->updateUniformBuffers(currentImage);
 
         vulkanManager->drawFrame(currentImage);
