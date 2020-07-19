@@ -74,10 +74,11 @@ namespace Skip {
 				_vertices.push_back(temp_vertices[_indices[i]]);
 			}
 		}
-		glm::mat4 pMat = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 10.0f);
+		glm::mat4 pMat = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 1000.0f);
 		pMat[1][1] *= -1;
 
 		_mvpUBO.proj = pMat;
+		_lightUBO.position = _position;
 	}
 
 }
