@@ -32,16 +32,16 @@ void main() {
 
     // normalize the light, normal and view vectors
     vec3 L = normalize(varyingLightDir);
+    vec3 N = normalize(varyingNormal);
     vec3 V = normalize(varyingVertPos);
     vec3 H = normalize(varyingHalfVector);
-    vec3 N = normalize(varyingNormal);
 
     float cosTheta = dot(L,N);
     float cosPhi = dot(H,N);
 
     vec3 ambient = ((light.globalAmbient * light.matAmbient) + (light.ambient * light.matAmbient)).xyz;
-    vec3 diffuse = (light.diffuse * light.matDiffuse * max(cosTheta, 0.0)).xyz;
-    vec3 specular = (light.specular * light.matSpecular * pow(max(cosPhi, 0.0), light.matShininess * 3)).xyz;
+    vec3 diffuse = light.diffuse.xyz * light.matDiffuse.xyz * max(cosTheta, 0.0);
+    vec3 specular = light.specular.xyz * light.matSpecular.xyz * pow(max(cosPhi, 0.0), light.matShininess * 3);
 
     outColor = texel * vec4((ambient + diffuse + specular), 1.0);
 }
