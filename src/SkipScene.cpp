@@ -23,7 +23,10 @@ namespace Skip {
         }
     }
 
-    void SkipScene::addObject(SkipObject* skipObject) {
+    void SkipScene::addObject(SkipObject* skipObject, SkipObject* parent) {
+        if (parent != nullptr) {
+            parent->addChild(skipObject);
+        }
         _objects.push_back(skipObject);
     }
 

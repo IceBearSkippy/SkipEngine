@@ -11,11 +11,19 @@ namespace Skip {
         _mvpUBO = MvpBufferObject{};
         _mvpUBO.model = GetPositionMatrix();
         _lightUBO = LightBufferObject{};
-
-
     }
 
     SkipObject::~SkipObject() {
+    }
+
+    void SkipObject::addChild(SkipObject* child, bool inheritLighting) {
+        if (inheritLighting) {
+            child->_lightUBO.ambient = child->_lightUBO.ambient * this->_lightUBO.ambient;
+            child->_lightUBO.diffuse = child->_lightUBO.diffuse * this->_lightUBO.diffuse;
+            child->_lightUBO.specular = child->_lightUBO.specular * this->_lightUBO.specular;
+            child->_lightUBO.globalAmbient = this->_lightUBO.globalAmbient;
+        }
+        _children.push_back(child);
     }
 
     glm::mat4 SkipObject::GetPositionMatrix() {

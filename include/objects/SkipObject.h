@@ -43,13 +43,7 @@ namespace std {
 }
 
 namespace Skip {
-    struct MvpBufferObject {
-        alignas(16) glm::mat4 model;
-        alignas(16) glm::mat4 view;
-        alignas(16) glm::mat4 proj;
-        alignas(16) glm::mat4 norm;
-    };
-
+    
     const glm::vec4 DEFAULT_GLOBAL_AMBIENT = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f);
 
     const glm::vec4 DEFAULT_AMBIENT = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -62,6 +56,13 @@ namespace Skip {
     const float DEFAULT_MATERIAL_SHININESS = 25.6f;
 
     const glm::vec3 DEFAULT_LIGHT_POSITION = glm::vec3(5.0f, -3.0f, 1.0f);
+
+    struct MvpBufferObject {
+        alignas(16) glm::mat4 model;
+        alignas(16) glm::mat4 view;
+        alignas(16) glm::mat4 proj;
+        alignas(16) glm::mat4 norm;
+    };
 
     struct LightBufferObject {
         alignas(16) glm::vec4 globalAmbient = DEFAULT_GLOBAL_AMBIENT;
@@ -83,6 +84,8 @@ namespace Skip {
     public:
         SkipObject(std::string name = DEFAULT_NAME, glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), std::string texturePath = DEFAULT_TEXTURE, bool useIndexBuffer = false);
         ~SkipObject();
+
+        void addChild(SkipObject* child, bool inheritLighting = true);
         virtual void loadObject(float aspect) = 0;
 
         std::string _name;
@@ -116,6 +119,8 @@ namespace Skip {
 
         std::vector<VkBuffer> _lightUboBuffers;
         std::vector<VkDeviceMemory> _lightUboBuffersMemory;
+
+        std::vector<SkipObject*> _children;
     private:
 
     };
