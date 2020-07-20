@@ -16,7 +16,7 @@ namespace Skip {
         void loadScene(float aspect);
 
         // Used to dynamically change objects for events
-        void addObject(SkipObject* skipObject, SkipObject* parent = nullptr);
+        void addObject(SkipObject* skipObject, SkipObject* parent = nullptr, bool inheritLighting = true);
         void removeObject(std::string name); 
 
         Camera* _camera;

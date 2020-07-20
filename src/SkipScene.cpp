@@ -23,9 +23,9 @@ namespace Skip {
         }
     }
 
-    void SkipScene::addObject(SkipObject* skipObject, SkipObject* parent) {
+    void SkipScene::addObject(SkipObject* skipObject, SkipObject* parent, bool inheritLighting) {
         if (parent != nullptr) {
-            parent->addChild(skipObject);
+            parent->addChild(skipObject, inheritLighting);
         }
         _objects.push_back(skipObject);
     }
