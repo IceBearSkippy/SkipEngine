@@ -32,16 +32,27 @@ int main()
         "resources/models/viking_room.obj",
         true
     );
-    scene->addObject(modelObject);
     Skip::Sphere* lightSphere = new Skip::Sphere(
         glm::vec3(2.0f, 1.5f, 0.0f), 12, DEFAULT_TEXTURE, false
     );
-    scene->addObject(lightSphere);
-
     Skip::Sphere* sphere = new Skip::Sphere(
         glm::vec3(2.0f, 1.0f, 0.0f), 24, DEFAULT_TEXTURE, false
     );
-    scene->addObject(sphere);
+
+
+    lightSphere->_mvpUBO.model = lightSphere->GetPositionMatrix() * Skip::buildScale(0.1f, 0.1f, 0.1f);
+    lightSphere->_lightUBO.globalAmbient *= 3.0f;
+    lightSphere->_lightUBO.ambient = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
+    lightSphere->_lightUBO.diffuse = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
+    lightSphere->_lightUBO.specular = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
+
+    sphere->_mvpUBO.model = sphere->GetPositionMatrix() * Skip::buildScale(0.3f, 0.3f, 0.3f);
+
+    modelObject->_mvpUBO.model = Skip::buildRotateX(glm::radians(90.0f));
+
+    scene->addObject(lightSphere);
+    scene->addObject(modelObject, lightSphere);
+    scene->addObject(sphere, lightSphere);
 
     // create window
     // Window will create keys to events based on components
@@ -56,19 +67,6 @@ int main()
     float lastTime = 0.0;
     glm::mat4 mvMat;
 
-    lightSphere->_mvpUBO.model = lightSphere->GetPositionMatrix() * Skip::buildScale(0.1f, 0.1f, 0.1f);
-    lightSphere->_lightUBO.globalAmbient *= 100.0f;
-    lightSphere->_lightUBO.ambient = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
-    lightSphere->_lightUBO.diffuse = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
-    lightSphere->_lightUBO.specular = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
-
-
-    sphere->_mvpUBO.model = sphere->GetPositionMatrix() * Skip::buildScale(0.3f, 0.3f, 0.3f);
-    sphere->_lightUBO.ambient = sphere->_lightUBO.ambient * lightSphere->_lightUBO.ambient;
-    sphere->_lightUBO.diffuse = sphere->_lightUBO.diffuse * lightSphere->_lightUBO.diffuse;
-    sphere->_lightUBO.specular = sphere->_lightUBO.specular * lightSphere->_lightUBO.specular;
-
-    modelObject->_mvpUBO.model = Skip::buildRotateX(glm::radians(90.0f));
     while (!window->shouldClose()) {
         glfwPollEvents();
 
@@ -80,6 +78,8 @@ int main()
         window->processKeys(deltaTime);
 
         modelObject->_mvpUBO.view = scene->_camera->GetViewMatrix();
+        mvMat = lightSphere->_mvpUBO.view * lightSphere->_mvpUBO.model;
+        lightSphere->_mvpUBO.norm = glm::transpose(glm::inverse((mvMat)));
 
         lightSphere->_mvpUBO.view = scene->_camera->GetViewMatrix();
         mvMat = lightSphere->_mvpUBO.view * lightSphere->_mvpUBO.model;
