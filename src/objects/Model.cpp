@@ -7,15 +7,22 @@ namespace Skip {
 
     }
 
-    Model::Model(glm::vec3 position, std::string texturePath, bool useIndexBuffer)
-        : SkipObject(position, texturePath, useIndexBuffer), _modelPath(DEFAULT_MODEL) {
+    Model::Model(std::string name, glm::vec3 position, std::string texturePath, bool useIndexBuffer)
+        : SkipObject(name, position, texturePath, useIndexBuffer), _modelPath(DEFAULT_MODEL) {
     }
+    Model::Model(glm::vec3 position, std::string texturePath, bool useIndexBuffer) 
+        : SkipObject(DEFAULT_MODEL_NAME, position, texturePath, useIndexBuffer) {
 
-    Model::Model(glm::vec3 position, std::string texturePath, std::string modelPath, bool useIndexBuffer)
-        : SkipObject(position, texturePath, useIndexBuffer) {
+    }
+    Model::Model(std::string name, glm::vec3 position, std::string texturePath, std::string modelPath, bool useIndexBuffer)
+        : SkipObject(name, position, texturePath, useIndexBuffer) {
         _modelPath = modelPath;
     }
+    Model::Model(glm::vec3 position, std::string texturePath, std::string modelPath, bool useIndexBuffer)
+        : SkipObject(DEFAULT_MODEL_NAME, position, texturePath, useIndexBuffer) {
+        _modelPath = modelPath;
 
+    }
     Model::~Model() {
     }
 
@@ -71,7 +78,14 @@ namespace Skip {
                 
             }
         }
-        
+
+        glm::mat4 pMat = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 1000.0f);
+        pMat[1][1] *= -1;
+
+        _mvpUBO.proj = pMat;
+        if (!_inheritLighting) {
+            _lightUBO.position = _position;
+        }
     }
 
 }

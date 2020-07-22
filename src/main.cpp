@@ -8,7 +8,7 @@ using namespace std;
 Skip::VulkanWindow* window;
 Skip::VulkanManager* vulkanManager;
 Skip::VulkanSwapchain* swapchain;
-Skip::Camera* camera;
+Skip::SkipScene* scene;
 
 int main()
 {
@@ -21,8 +21,8 @@ int main()
     // We will interact with Vulkan manager and vulkan window
     // GLFW will live in VulkanWindow and have public access
 
-    // create components
-    camera = new Skip::Camera(glm::vec3(2.0f, 2.0f, 2.0f));
+    // create scene with camera position
+    scene = new Skip::SkipScene(glm::vec3(2.0f, 2.0f, 2.0f));
 
     std::vector<Skip::SkipObject*> skipObjects;
 
@@ -32,29 +32,41 @@ int main()
         "resources/models/viking_room.obj",
         true
     );
-    skipObjects.push_back(modelObject);
-    Skip::Cube* cube = new Skip::Cube(
-        glm::vec3(2.0f, 1.0f, 0.0f), DEFAULT_TEXTURE, false
+    Skip::Sphere* lightSphere = new Skip::Sphere(
+        "LightSphere", glm::vec3(1.0f, 1.5f, 0.0f), 12, DEFAULT_TEXTURE, false
     );
-    skipObjects.push_back(cube);
-
     Skip::Sphere* sphere = new Skip::Sphere(
-        glm::vec3(2.0f, 1.5f, 0.0f), 12, DEFAULT_TEXTURE, false
+        glm::vec3(1.0f, 0.2f, 0.0f), 24, DEFAULT_TEXTURE, false
     );
-    skipObjects.push_back(sphere);
+
+
+    lightSphere->_mvpUBO.model = lightSphere->GetPositionMatrix() * Skip::buildScale(0.1f, 0.1f, 0.1f);
+    lightSphere->_lightUBO.globalAmbient *= 3.0f;
+    lightSphere->_lightUBO.ambient *= 100.0f;
+    lightSphere->_lightUBO.diffuse *= 50.0f;
+    lightSphere->_lightUBO.specular *= 0.5f;
+
+    sphere->_mvpUBO.model = sphere->GetPositionMatrix() * Skip::buildScale(0.1f, 0.1f, 0.1f);
+
+    modelObject->_mvpUBO.model = Skip::buildRotateX(glm::radians(90.0f));
+
+    scene->addObject(lightSphere);
+    scene->addObject(modelObject, lightSphere);
+    scene->addObject(sphere, lightSphere);
 
     // create window
     // Window will create keys to events based on components
-    window = new Skip::VulkanWindow(camera);
+    window = new Skip::VulkanWindow(scene);
     window->init();
 
-    vulkanManager = new Skip::VulkanManager(window, skipObjects, enableValidationLayers);
+    vulkanManager = new Skip::VulkanManager(window, scene, enableValidationLayers);
     swapchain = vulkanManager->_vulkanSwapchain;
 
     uint32_t currentImage;
     float currentTime, deltaTime;
     float lastTime = 0.0;
-    glm::mat4 mvpMat;
+    glm::mat4 mvMat;
+
     while (!window->shouldClose()) {
         glfwPollEvents();
 
@@ -65,29 +77,18 @@ int main()
 
         window->processKeys(deltaTime);
 
-        modelObject->_mvpUBO.model = Skip::buildRotateX(glm::radians(90.0f));
-        modelObject->_mvpUBO.view = camera->GetViewMatrix();
-        modelObject->_mvpUBO.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
-        modelObject->_mvpUBO.proj[1][1] *= -1;
+        modelObject->_mvpUBO.view = scene->_camera->GetViewMatrix();
+        mvMat = modelObject->_mvpUBO.view * modelObject->_mvpUBO.model;
+        modelObject->_mvpUBO.norm = glm::transpose(glm::inverse((mvMat)));
 
-        cube->_mvpUBO.model = cube->GetPositionMatrix() * Skip::buildScale(0.2f, 0.2f, 0.2f);
-        cube->_mvpUBO.view = camera->GetViewMatrix();
-        cube->_mvpUBO.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
-        cube->_mvpUBO.proj[1][1] *= -1;
-        mvpMat = cube->_mvpUBO.proj * cube->_mvpUBO.view * cube->_mvpUBO.model;
-        cube->_mvpUBO.norm = glm::transpose(glm::inverse((mvpMat)));
+        lightSphere->_mvpUBO.view = scene->_camera->GetViewMatrix();
+        mvMat = lightSphere->_mvpUBO.view * lightSphere->_mvpUBO.model;
+        lightSphere->_mvpUBO.norm = glm::transpose(glm::inverse((mvMat)));
 
-        sphere->_mvpUBO.model = sphere->GetPositionMatrix() * Skip::buildScale(0.2f, 0.2f, 0.2f);
-        sphere->_mvpUBO.view = camera->GetViewMatrix();
-        sphere->_mvpUBO.proj = glm::perspective(glm::radians(45.0f), swapchain->_swapChainExtent.width / (float)swapchain->_swapChainExtent.height, 0.1f, 10.0f);
-        sphere->_mvpUBO.proj[1][1] *= -1;
-        sphere->_lightUBO.ambient = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 100.0f;
-        sphere->_lightUBO.diffuse = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
-        sphere->_lightUBO.specular = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
+        sphere->_mvpUBO.view = scene->_camera->GetViewMatrix();
+        mvMat = sphere->_mvpUBO.view * sphere->_mvpUBO.model;
+        sphere->_mvpUBO.norm = glm::transpose(glm::inverse((mvMat)));
 
-        mvpMat = sphere->_mvpUBO.proj * sphere->_mvpUBO.view * sphere->_mvpUBO.model;
-        sphere->_mvpUBO.norm = glm::transpose(glm::inverse((mvpMat)));
-        
         swapchain->updateUniformBuffers(currentImage);
 
         vulkanManager->drawFrame(currentImage);

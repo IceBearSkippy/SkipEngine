@@ -3,17 +3,28 @@
 namespace Skip {
 
 
-    SkipObject::SkipObject(glm::vec3 position, std::string texturePath, bool useIndexBuffer) {
+    SkipObject::SkipObject(std::string name, glm::vec3 position, std::string texturePath, bool useIndexBuffer) {
+        _name = name;
         _position = position;
         _texturePath = texturePath;
         _useIndexBuffer = useIndexBuffer;
         _mvpUBO = MvpBufferObject{};
         _mvpUBO.model = GetPositionMatrix();
         _lightUBO = LightBufferObject{};
-
-
     }
+
     SkipObject::~SkipObject() {
+    }
+
+    void SkipObject::addChild(SkipObject* child, bool inheritLighting) {
+        if (inheritLighting) {
+            child->_lightUBO.position = this->_position - child->_position;
+            child->_lightUBO.ambient = this->_lightUBO.ambient * child->_lightUBO.ambient;
+            child->_lightUBO.diffuse = this->_lightUBO.diffuse * child->_lightUBO.diffuse;
+            child->_lightUBO.specular = this->_lightUBO.specular * child->_lightUBO.specular;
+            child->_lightUBO.globalAmbient = this->_lightUBO.globalAmbient * child->_lightUBO.globalAmbient;
+        }
+        _children.push_back(child);
     }
 
     glm::mat4 SkipObject::GetPositionMatrix() {

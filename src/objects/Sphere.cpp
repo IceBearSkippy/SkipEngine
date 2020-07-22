@@ -8,9 +8,13 @@ namespace Skip {
         : SkipObject() {
 
     }
+	Sphere::Sphere(glm::vec3 position, int precision, std::string texturePath, bool useIndexBuffer) 
+		: SkipObject(DEFAULT_SPHERE_NAME, position, texturePath, useIndexBuffer) {
+		_precision = precision;
+	}
 
-    Sphere::Sphere(glm::vec3 position, int precision, std::string texturePath, bool useIndexBuffer)
-        : SkipObject(position, texturePath, useIndexBuffer) {
+    Sphere::Sphere(std::string name, glm::vec3 position, int precision, std::string texturePath, bool useIndexBuffer)
+        : SkipObject(name, position, texturePath, useIndexBuffer) {
 		_precision = precision;
 
     }
@@ -70,7 +74,13 @@ namespace Skip {
 				_vertices.push_back(temp_vertices[_indices[i]]);
 			}
 		}
-		
+		glm::mat4 pMat = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 1000.0f);
+		pMat[1][1] *= -1;
+
+		_mvpUBO.proj = pMat;
+		if (!_inheritLighting) {
+			_lightUBO.position = _position;
+		}
 	}
 
 }

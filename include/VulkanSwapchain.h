@@ -29,7 +29,7 @@ namespace Skip {
 
     public:
         VulkanSwapchain();
-        VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, std::vector<SkipObject*> skipObjects);
+        VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, SkipScene* scene);
         ~VulkanSwapchain();
 
         VulkanDevice* _vkDevice = nullptr;
@@ -52,7 +52,7 @@ namespace Skip {
         VkDeviceMemory _depthImageMemory;
         VkImageView _depthImageView;
         std::vector<VkFramebuffer> _swapChainFramebuffers;
-        std::vector<SkipObject*>  _skipObjects;
+        SkipScene* _scene;
         SwapchainDetails querySwapchain();
 
         VkDescriptorPool _descriptorPool;

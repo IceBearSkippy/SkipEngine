@@ -7,8 +7,12 @@ namespace Skip {
 
     }
 
+    Cube::Cube(std::string name, glm::vec3 position, std::string texturePath, bool useIndexBuffer)
+        : SkipObject(name, position, texturePath, useIndexBuffer) {
+    }
+
     Cube::Cube(glm::vec3 position, std::string texturePath, bool useIndexBuffer)
-        : SkipObject(position, texturePath, useIndexBuffer) {
+        : SkipObject(DEFAULT_CUBE_NAME, position, texturePath, useIndexBuffer) {
     }
 
     Cube::~Cube() {
@@ -25,6 +29,14 @@ namespace Skip {
             } else {
                 _vertices.push_back(vertex);
             }
+        }
+
+        glm::mat4 pMat = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 1000.0f);
+        pMat[1][1] *= -1;
+
+        _mvpUBO.proj = pMat;
+        if (!_inheritLighting) {
+            _lightUBO.position = _position;
         }
     }
 }

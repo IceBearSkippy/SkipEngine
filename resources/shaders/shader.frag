@@ -23,6 +23,7 @@ layout(location = 2) in vec3 varyingLightDir;
 layout(location = 3) in vec3 varyingVertPos;
 layout(location = 4) in vec3 varyingHalfVector;
 layout(location = 5) in vec3 varyingNormal;
+layout(location = 6) in vec3 lightPos;
 
 layout(location = 0) out vec4 outColor;
 
@@ -32,16 +33,16 @@ void main() {
 
     // normalize the light, normal and view vectors
     vec3 L = normalize(varyingLightDir);
-    vec3 V = normalize(varyingVertPos);
-    vec3 H = normalize(varyingHalfVector);
     vec3 N = normalize(varyingNormal);
+    vec3 V = normalize(-varyingVertPos);
+    vec3 H = normalize(varyingHalfVector);
 
     float cosTheta = dot(L,N);
     float cosPhi = dot(H,N);
+    float lightToVertDistance = pow(distance(varyingVertPos, lightPos), 2);
+    vec3 ambient = ((light.globalAmbient * light.matAmbient) + (light.ambient * light.matAmbient)).xyz / lightToVertDistance;
+    vec3 diffuse = (light.diffuse.xyz * light.matDiffuse.xyz * max(cosTheta, 0.0)) / lightToVertDistance;
+    vec3 specular = light.specular.xyz * light.matSpecular.xyz * pow(max(cosPhi, 0.0), light.matShininess) / lightToVertDistance;
 
-    vec3 ambient = ((light.globalAmbient * light.matAmbient) + (light.ambient * light.matAmbient)).xyz;
-    vec3 diffuse = (light.diffuse * light.matDiffuse * max(cosTheta, 0.0)).xyz;
-    vec3 specular = (light.specular * light.matSpecular * pow(max(cosPhi, 0.0), light.matShininess * 3)).xyz;
-
-    outColor = texel * vec4((ambient + diffuse + specular), 1.0);
+    outColor =  vec4((ambient + diffuse + specular), 1.0) * texel;
 }

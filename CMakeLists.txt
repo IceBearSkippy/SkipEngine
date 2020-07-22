@@ -47,6 +47,7 @@ list ( APPEND PROJECT_EXECUTABLE_FILES
   ${SOURCE_FOLDER}/objects/Model.cpp
   ${SOURCE_FOLDER}/objects/Cube.cpp
   ${SOURCE_FOLDER}/objects/Sphere.cpp
+  ${SOURCE_FOLDER}/SkipScene.cpp
   ${SOURCE_FOLDER}/Camera.cpp
   ${SOURCE_FOLDER}/VulkanManager.cpp
   ${SOURCE_FOLDER}/main.cpp
