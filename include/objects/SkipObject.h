@@ -46,9 +46,9 @@ namespace Skip {
     
     const glm::vec4 DEFAULT_GLOBAL_AMBIENT = glm::vec4(0.7f, 0.7f, 0.7f, 1.0f);
 
-    const glm::vec4 DEFAULT_AMBIENT = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
-    const glm::vec4 DEFAULT_DIFFUSE = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-    const glm::vec4 DEFAULT_SPECULAR = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    const glm::vec4 DEFAULT_AMBIENT = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
+    const glm::vec4 DEFAULT_DIFFUSE = glm::vec4(0.4f, 0.4f, 0.4f, 1.0f);
+    const glm::vec4 DEFAULT_SPECULAR = glm::vec4(0.3f, 0.3f, 0.3f, 1.0f);
 
     const glm::vec4 DEFAULT_MATERIAL_AMBIENT = glm::vec4(0.2125f, 0.1275f, 0.0540f, 1);
     const glm::vec4 DEFAULT_MATERIAL_DIFFUSE = glm::vec4(0.7140f, 0.4284f, 0.1814f, 1);
@@ -121,6 +121,7 @@ namespace Skip {
         std::vector<VkDeviceMemory> _lightUboBuffersMemory;
 
         std::vector<SkipObject*> _children;
+        bool _inheritLighting = false;
     private:
 
     };

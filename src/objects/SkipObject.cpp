@@ -18,10 +18,11 @@ namespace Skip {
 
     void SkipObject::addChild(SkipObject* child, bool inheritLighting) {
         if (inheritLighting) {
-            child->_lightUBO.ambient = child->_lightUBO.ambient * this->_lightUBO.ambient;
-            child->_lightUBO.diffuse = child->_lightUBO.diffuse * this->_lightUBO.diffuse;
-            child->_lightUBO.specular = child->_lightUBO.specular * this->_lightUBO.specular;
-            child->_lightUBO.globalAmbient = this->_lightUBO.globalAmbient;
+            child->_lightUBO.position = this->_position - child->_position;
+            child->_lightUBO.ambient = this->_lightUBO.ambient * child->_lightUBO.ambient;
+            child->_lightUBO.diffuse = this->_lightUBO.diffuse * child->_lightUBO.diffuse;
+            child->_lightUBO.specular = this->_lightUBO.specular * child->_lightUBO.specular;
+            child->_lightUBO.globalAmbient = this->_lightUBO.globalAmbient * child->_lightUBO.globalAmbient;
         }
         _children.push_back(child);
     }

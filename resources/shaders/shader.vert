@@ -35,16 +35,18 @@ layout(location = 2) out vec3 varyingLightDir;  // vector pointing to the light
 layout(location = 3) out vec3 varyingVertPos;   // vertex position in eye space
 layout(location = 4) out vec3 varyingHalfVector;
 layout(location = 5) out vec3 varyingNormal;
+layout(location = 6) out vec3 lightPos;
 
 void main() {
     mat4 mvMatrix = mvp.view * mvp.model;
-
-    varyingVertPos = (mvMatrix * vec4(vertPosition, 1.0)).xyz;
-    varyingLightDir = light.position - varyingVertPos;
-    varyingHalfVector = (varyingLightDir + (-varyingVertPos)).xyz;
-    varyingNormal = (mvp.norm * vec4(vertNormal, 1.0)).xyz;
     fragColor = vertColor;
     fragTexCoord = texCoord;
+    varyingVertPos = (mvMatrix * vec4(vertPosition, 1.0)).xyz;
+    
+    varyingLightDir = (mvMatrix * vec4(light.position, 1.0)).xyz - varyingVertPos;
+    varyingHalfVector = (varyingLightDir + (-varyingVertPos)).xyz;
+    varyingNormal = (mvp.norm * vec4(vertNormal, 1.0)).xyz;
+    lightPos = light.position;
 
     gl_Position = mvp.proj * mvMatrix * vec4(vertPosition, 1.0);
 
