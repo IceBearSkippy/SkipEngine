@@ -78,7 +78,9 @@ namespace Skip {
 		pMat[1][1] *= -1;
 
 		_mvpUBO.proj = pMat;
-		_lightUBO.position = _position;
+		if (!_inheritLighting) {
+			_lightUBO.position = _position;
+		}
 	}
 
 }
