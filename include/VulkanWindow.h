@@ -7,6 +7,8 @@
 
 #include <vulkan/vulkan.h>
 #include <string>
+#include <chrono>
+#include <thread>
 
 #include <SkipScene.h>
 
@@ -27,8 +29,7 @@ namespace Skip {
         unsigned int _height;
         std::string _title;
         
-        
-
+        bool _cameraActive = false;
         bool _framebufferResized = false;
         GLFWwindow* _glfw = nullptr;
         VkSurfaceKHR _surface = VK_NULL_HANDLE;

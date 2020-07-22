@@ -1,7 +1,7 @@
 #include <VulkanWindow.h>
 
-const uint32_t DEFAULT_WINDOW_WIDTH = 800;
-const uint32_t DEFAULT_WINDOW_HEIGHT = 600;
+const uint32_t DEFAULT_WINDOW_WIDTH = 1200;
+const uint32_t DEFAULT_WINDOW_HEIGHT = 800;
 const char* DEFAULT_WINDOW_NAME = "Skip";
 bool keys[1024];
 
@@ -48,8 +48,8 @@ namespace Skip {
         glfwSetWindowUserPointer(_glfw, this);
 
         glfwSetKeyCallback(_glfw, this->KeyCallback);
-        glfwSetCursorPosCallback(_glfw, this->MouseCallback);
-        glfwSetInputMode(_glfw, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        //glfwSetCursorPosCallback(_glfw, this->MouseCallback);
+        glfwSetInputMode(_glfw, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
         glfwSetFramebufferSizeCallback(_glfw, framebufferResizeCallback);
     }
@@ -60,6 +60,18 @@ namespace Skip {
     }
 
     void VulkanWindow::processKeys(float deltaTime) {
+        if (keys[GLFW_KEY_TAB]) {
+            _cameraActive = !_cameraActive;
+            if (_cameraActive) {
+                glfwSetInputMode(_glfw, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                glfwSetCursorPosCallback(_glfw, this->MouseCallback);
+            } else {
+                glfwSetInputMode(_glfw, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                glfwSetCursorPosCallback(_glfw, nullptr);
+                firstMouse = true;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
         if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP]) {
             _scene->_camera->ProcessKeyboard(FORWARD, deltaTime);
         }
@@ -94,19 +106,21 @@ namespace Skip {
     void VulkanWindow::MouseCallback(GLFWwindow* window, double xPos, double yPos) {
         VulkanWindow* vulkanWindow =
             static_cast<VulkanWindow*>(glfwGetWindowUserPointer(window));
-        Camera* camera = vulkanWindow->_scene->_camera;
-        if (firstMouse) {
+        if (vulkanWindow->_cameraActive) {
+            Camera* camera = vulkanWindow->_scene->_camera;
+            if (firstMouse) {
+                lastX = xPos;
+                lastY = yPos;
+                firstMouse = false;
+            }
+
+            float xOffset = xPos - lastX;
+            float yOffset = lastY - yPos;  // Reversed since y-coordinates go from bottom to left
+
             lastX = xPos;
             lastY = yPos;
-            firstMouse = false;
+
+            camera->ProcessMouseMovement(xOffset, yOffset);
         }
-
-        float xOffset = xPos - lastX;
-        float yOffset = lastY - yPos;  // Reversed since y-coordinates go from bottom to left
-
-        lastX = xPos;
-        lastY = yPos;
-
-        camera->ProcessMouseMovement(xOffset, yOffset);
     }
 }
