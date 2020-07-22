@@ -33,20 +33,20 @@ int main()
         true
     );
     Skip::Sphere* lightSphere = new Skip::Sphere(
-        glm::vec3(2.0f, 1.5f, 0.0f), 12, DEFAULT_TEXTURE, false
+        "LightSphere", glm::vec3(1.0f, 1.5f, 0.0f), 12, DEFAULT_TEXTURE, false
     );
     Skip::Sphere* sphere = new Skip::Sphere(
-        glm::vec3(2.0f, 1.0f, 0.0f), 24, DEFAULT_TEXTURE, false
+        glm::vec3(1.0f, 0.2f, 0.0f), 24, DEFAULT_TEXTURE, false
     );
 
 
     lightSphere->_mvpUBO.model = lightSphere->GetPositionMatrix() * Skip::buildScale(0.1f, 0.1f, 0.1f);
     lightSphere->_lightUBO.globalAmbient *= 3.0f;
-    lightSphere->_lightUBO.ambient = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 100.0f;
-    lightSphere->_lightUBO.diffuse = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
-    lightSphere->_lightUBO.specular = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f) * 10.0f;
+    lightSphere->_lightUBO.ambient *= 100.0f;
+    lightSphere->_lightUBO.diffuse *= 50.0f;
+    lightSphere->_lightUBO.specular *= 0.5f;
 
-    sphere->_mvpUBO.model = sphere->GetPositionMatrix() * Skip::buildScale(0.3f, 0.3f, 0.3f);
+    sphere->_mvpUBO.model = sphere->GetPositionMatrix() * Skip::buildScale(0.1f, 0.1f, 0.1f);
 
     modelObject->_mvpUBO.model = Skip::buildRotateX(glm::radians(90.0f));
 
@@ -78,17 +78,16 @@ int main()
         window->processKeys(deltaTime);
 
         modelObject->_mvpUBO.view = scene->_camera->GetViewMatrix();
-        mvMat = lightSphere->_mvpUBO.view * lightSphere->_mvpUBO.model;
-        lightSphere->_mvpUBO.norm = glm::transpose(glm::inverse((mvMat)));
+        mvMat = modelObject->_mvpUBO.view * modelObject->_mvpUBO.model;
+        modelObject->_mvpUBO.norm = glm::transpose(glm::inverse((mvMat)));
 
         lightSphere->_mvpUBO.view = scene->_camera->GetViewMatrix();
         mvMat = lightSphere->_mvpUBO.view * lightSphere->_mvpUBO.model;
         lightSphere->_mvpUBO.norm = glm::transpose(glm::inverse((mvMat)));
-        
+
         sphere->_mvpUBO.view = scene->_camera->GetViewMatrix();
-        mvMat = lightSphere->_mvpUBO.view * sphere->_mvpUBO.model;
+        mvMat = sphere->_mvpUBO.view * sphere->_mvpUBO.model;
         sphere->_mvpUBO.norm = glm::transpose(glm::inverse((mvMat)));
-        sphere->_lightUBO.position = lightSphere->_lightUBO.position;
 
         swapchain->updateUniformBuffers(currentImage);
 
