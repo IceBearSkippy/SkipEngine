@@ -31,6 +31,7 @@ find_package( Vulkan REQUIRED )
 find_package( glfw3 REQUIRED )
 find_package( glm REQUIRED )
 find_package( tinyobjloader REQUIRED )
+find_package( imgui REQUIRED )
 
 list ( APPEND PROJECT_INCLUDE_DIRECTORIES
   ${SOURCE_FOLDER}
@@ -76,3 +77,4 @@ endif()
 target_link_libraries( ${APP_NAME} tinyobjloader::tinyobjloader )
 target_link_libraries( ${APP_NAME} glfw )
 target_link_libraries( ${APP_NAME} glm )
+target_link_libraries( ${APP_NAME} imgui::imgui )
