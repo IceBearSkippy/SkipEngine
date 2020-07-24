@@ -41,6 +41,7 @@ namespace Skip {
         VkExtent2D _swapChainExtent;
         std::vector<VkImageView> _swapChainImageViews;
         VkRenderPass _renderPass;
+        VkRenderPass _imGuiRenderPass;
         VkDescriptorSetLayout _descriptorSetLayout;
         VkPipelineLayout _pipelineLayout;
         VkPipeline _graphicsPipeline;

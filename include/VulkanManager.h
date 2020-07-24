@@ -74,6 +74,7 @@ namespace Skip {
         GPUInfo createGPUInfo(VkPhysicalDevice device);
         GPUInfo* pickPhysicalDevice();
 
+        void setupImGUI();
     };
 
 
