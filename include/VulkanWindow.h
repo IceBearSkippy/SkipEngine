@@ -5,9 +5,6 @@
 #include <GLFW/glfw3.h>
 #endif
 
-#include <imgui.h>
-#include <imgui/imgui_impl_glfw.h>
-#include <imgui/imgui_impl_vulkan.h>
 #include <vulkan/vulkan.h>
 #include <string>
 #include <chrono>
@@ -25,7 +22,6 @@ namespace Skip {
         VulkanWindow(uint32_t width, uint32_t height, char* title, SkipScene* scene);
         ~VulkanWindow();
         void init();
-        void setupImGUI();
         bool shouldClose();
         void processKeys(float deltaTime);
 

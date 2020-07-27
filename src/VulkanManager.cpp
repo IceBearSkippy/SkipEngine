@@ -34,6 +34,7 @@ namespace Skip {
         }
         _vulkanSwapchain->~VulkanSwapchain();
         if (_window->_surface != VK_NULL_HANDLE) {
+            //ImGui_ImplVulkanH_DestroyWindow(_instance, *_vulkanDevice->getLogicalDevice(), _imguiWindow, nullptr);
             vkDestroySurfaceKHR(_instance, _window->_surface, nullptr);;
         }
 
@@ -322,9 +323,19 @@ namespace Skip {
 
     void VulkanManager::setupImGUI() {
         // TODO: Upload fonts to GPU, main loop and describe UI
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+        //ImGui::StyleColorsClassic();
 
         QueueFamilyIndices queueFamilyIndices = QueueFamilyIndices::findQueueFamilies(_vulkanDevice->_gpuInfo, _window->_surface);
         ImGui_ImplGlfw_InitForVulkan(_window->_glfw, true);
+        
         ImGui_ImplVulkan_InitInfo init_info = {};
         init_info.Instance = _instance;
         init_info.PhysicalDevice = _vulkanDevice->getPhysicalDevice();
@@ -378,6 +389,30 @@ namespace Skip {
             throw std::runtime_error("Could not create Dear ImGui's render pass");
         }
 
+        VkCommandBuffer command_buffer = _vulkanSwapchain->beginSingleTimeCommands();
+        ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
+        _vulkanSwapchain->endSingleTimeCommands(command_buffer);
+
         ImGui_ImplVulkan_Init(&init_info, _vulkanSwapchain->_renderPass);
+
+        ImGui_ImplVulkan_SetMinImageCount(_vulkanSwapchain->_swapChainImages.size());
+        ImGui_ImplVulkanH_CreateOrResizeWindow(
+            _instance,
+            _vulkanDevice->getPhysicalDevice(),
+            *_vulkanDevice->getLogicalDevice(),
+            _imguiWindow,
+            queueFamilyIndices.graphicsFamily.value(),
+            nullptr,
+            _vulkanSwapchain->_swapChainExtent.width,
+            _vulkanSwapchain->_swapChainExtent.height,
+            _vulkanSwapchain->_swapChainImages.size()
+        );
+        _imguiWindow->FrameIndex = 0;
+
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow();
+        ImGui::Render();
     }
 }

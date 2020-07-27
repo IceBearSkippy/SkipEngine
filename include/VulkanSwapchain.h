@@ -79,6 +79,10 @@ namespace Skip {
         void drawFrame(uint32_t currentImage);
         void recreateSwapChain();
         void cleanupSwapChain();
+
+
+        VkCommandBuffer beginSingleTimeCommands();
+        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
     private:
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
         VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
@@ -98,8 +102,6 @@ namespace Skip {
         VkShaderModule createShaderModule(const std::vector<char>& code);
 
         void createCommandPool();
-        VkCommandBuffer beginSingleTimeCommands();
-        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
         void createColorResources();
         void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format,
