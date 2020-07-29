@@ -24,7 +24,7 @@ namespace Skip {
 
         _vulkanSwapchain = new VulkanSwapchain(_vulkanDevice, _window, scene);
 
-        this->setupImGUI();
+        this->setupImgui();
     }
 
     VulkanManager::~VulkanManager() {
@@ -34,7 +34,7 @@ namespace Skip {
         }
         _vulkanSwapchain->~VulkanSwapchain();
         if (_window->_surface != VK_NULL_HANDLE) {
-            //ImGui_ImplVulkanH_DestroyWindow(_instance, *_vulkanDevice->getLogicalDevice(), _imguiWindow, nullptr);
+            ImGui_ImplVulkanH_DestroyWindow(_instance, *_vulkanDevice->getLogicalDevice(), &_imguiWindow, nullptr);
             vkDestroySurfaceKHR(_instance, _window->_surface, nullptr);;
         }
 
@@ -321,8 +321,11 @@ namespace Skip {
         vkGetDeviceQueue(_vulkanDevice->_logicalDevice, indices.presentFamily.value(), 0, &_vulkanDevice->_queues.present);
     }
 
-    void VulkanManager::setupImGUI() {
-        // TODO: Upload fonts to GPU, main loop and describe UI
+    void VulkanManager::setupImgui() {
+        //TODO: Need to create window surface format for imgui
+
+        _vulkanSwapchain->createImguiDescriptorPool();
+
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -343,7 +346,7 @@ namespace Skip {
         init_info.QueueFamily = queueFamilyIndices.graphicsFamily.value();
         init_info.Queue = _vulkanDevice->_queues.graphics;
         init_info.PipelineCache = nullptr; // we don't have pipeline cache right now
-        init_info.DescriptorPool = _vulkanSwapchain->_descriptorPool;
+        init_info.DescriptorPool = _vulkanSwapchain->_imguiDescriptorPool;
         init_info.Allocator = nullptr;
         init_info.MinImageCount = _vulkanSwapchain->_swapChainImages.size();
         init_info.ImageCount = _vulkanSwapchain->_swapChainImages.size();
@@ -385,29 +388,32 @@ namespace Skip {
         info.pSubpasses = &subpass;
         info.dependencyCount = 1;
         info.pDependencies = &dependency;
-        if (vkCreateRenderPass(*_vulkanDevice->getLogicalDevice(), &info, nullptr, &_vulkanSwapchain->_imGuiRenderPass) != VK_SUCCESS) {
+        if (vkCreateRenderPass(*_vulkanDevice->getLogicalDevice(), &info, nullptr, &_vulkanSwapchain->_imguiRenderPass) != VK_SUCCESS) {
             throw std::runtime_error("Could not create Dear ImGui's render pass");
         }
 
-        VkCommandBuffer command_buffer = _vulkanSwapchain->beginSingleTimeCommands();
-        ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
-        _vulkanSwapchain->endSingleTimeCommands(command_buffer);
-
-        ImGui_ImplVulkan_Init(&init_info, _vulkanSwapchain->_renderPass);
+        ImGui_ImplVulkan_Init(&init_info, _vulkanSwapchain->_imguiRenderPass);
 
         ImGui_ImplVulkan_SetMinImageCount(_vulkanSwapchain->_swapChainImages.size());
+
+        ImGui_ImplVulkanH_Window* wd = &_imguiWindow;
+
         ImGui_ImplVulkanH_CreateOrResizeWindow(
             _instance,
-            _vulkanDevice->getPhysicalDevice(),
-            *_vulkanDevice->getLogicalDevice(),
-            _imguiWindow,
+            _vulkanDevice->_gpuInfo->device,
+            _vulkanDevice->_logicalDevice,
+            wd,
             queueFamilyIndices.graphicsFamily.value(),
-            nullptr,
+            NULL,
             _vulkanSwapchain->_swapChainExtent.width,
             _vulkanSwapchain->_swapChainExtent.height,
             _vulkanSwapchain->_swapChainImages.size()
         );
-        _imguiWindow->FrameIndex = 0;
+        _imguiWindow.FrameIndex = 0;
+
+        VkCommandBuffer command_buffer = _vulkanSwapchain->beginSingleTimeCommands();
+        ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
+        _vulkanSwapchain->endSingleTimeCommands(command_buffer);
 
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();

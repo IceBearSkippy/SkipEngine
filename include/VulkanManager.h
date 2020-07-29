@@ -9,7 +9,6 @@
 #include <set>
 #include <cstring>
 
-#include <imgui.h>
 #include <imgui/imgui_impl_vulkan.h>
 #include <imgui/imgui_impl_glfw.h>
 
@@ -56,7 +55,7 @@ namespace Skip {
         VulkanDevice* _vulkanDevice;
         VulkanSwapchain* _vulkanSwapchain;
 
-        ImGui_ImplVulkanH_Window* _imguiWindow;
+        ImGui_ImplVulkanH_Window _imguiWindow;
     private:
         void createInstance();
         void createSurface();
@@ -81,6 +80,6 @@ namespace Skip {
         GPUInfo createGPUInfo(VkPhysicalDevice device);
         GPUInfo* pickPhysicalDevice();
 
-        void setupImGUI();
+        void setupImgui();
     };
 }

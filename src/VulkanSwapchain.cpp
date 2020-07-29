@@ -1422,6 +1422,34 @@ namespace Skip {
         }
     }
 
+    void VulkanSwapchain::createImguiDescriptorPool() {
+        VkDescriptorPoolSize poolSizes[] =
+        {
+            { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+            { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+            { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+        };
+
+        VkDescriptorPoolCreateInfo poolInfo = {};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        poolInfo.maxSets = 1000 * IM_ARRAYSIZE(poolSizes);
+        poolInfo.poolSizeCount = (uint32_t)IM_ARRAYSIZE(poolSizes);
+        poolInfo.pPoolSizes = poolSizes;
+
+        if (vkCreateDescriptorPool(*_vkDevice->getLogicalDevice(), &poolInfo, nullptr, &_imguiDescriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create descriptor pool for imgui!");
+        }
+    }
+
     void VulkanSwapchain::createDescriptorSets() {
         // We'll create descriptor set for each SkipObject
 

@@ -17,6 +17,8 @@
 #include <VulkanDevice.h>
 #include <VulkanWindow.h>
 #include <objects/SkipObject.h>
+#include <imgui.h>
+
 namespace Skip {
 
     struct SwapchainDetails {
@@ -41,7 +43,7 @@ namespace Skip {
         VkExtent2D _swapChainExtent;
         std::vector<VkImageView> _swapChainImageViews;
         VkRenderPass _renderPass;
-        VkRenderPass _imGuiRenderPass;
+        VkRenderPass _imguiRenderPass;
         VkDescriptorSetLayout _descriptorSetLayout;
         VkPipelineLayout _pipelineLayout;
         VkPipeline _graphicsPipeline;
@@ -57,6 +59,8 @@ namespace Skip {
         SwapchainDetails querySwapchain();
 
         VkDescriptorPool _descriptorPool;
+        VkDescriptorPool _imguiDescriptorPool;
+
         std::vector<VkDescriptorSet> _descriptorSets;
         std::vector<VkCommandBuffer> _commandBuffers;
 
@@ -79,7 +83,7 @@ namespace Skip {
         void drawFrame(uint32_t currentImage);
         void recreateSwapChain();
         void cleanupSwapChain();
-
+        void createImguiDescriptorPool();
 
         VkCommandBuffer beginSingleTimeCommands();
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
