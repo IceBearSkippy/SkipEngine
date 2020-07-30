@@ -18,7 +18,8 @@
 #include <VulkanWindow.h>
 #include <objects/SkipObject.h>
 #include <imgui.h>
-
+#include <imgui/imgui_impl_vulkan.h>
+#include <imgui/imgui_impl_glfw.h>
 namespace Skip {
 
     struct SwapchainDetails {
@@ -31,11 +32,13 @@ namespace Skip {
 
     public:
         VulkanSwapchain();
-        VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, SkipScene* scene);
+        VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, VkInstance* instance, SkipScene* scene);
         ~VulkanSwapchain();
 
         VulkanDevice* _vkDevice = nullptr;
         VulkanWindow* _vkWindow = nullptr;
+
+        VkInstance* _instance;
 
         VkSwapchainKHR _swapChain;
         std::vector<VkImage> _swapChainImages;
@@ -59,7 +62,6 @@ namespace Skip {
         SwapchainDetails querySwapchain();
 
         VkDescriptorPool _descriptorPool;
-        VkDescriptorPool _imguiDescriptorPool;
 
         std::vector<VkDescriptorSet> _descriptorSets;
         std::vector<VkCommandBuffer> _commandBuffers;
@@ -83,12 +85,19 @@ namespace Skip {
         void drawFrame(uint32_t currentImage);
         void recreateSwapChain();
         void cleanupSwapChain();
-        void createImguiDescriptorPool();
 
         VkCommandBuffer beginSingleTimeCommands();
         void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-    private:
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+    
+        bool _isImGuiWindowCreated = false;
+
+        void initImgui();
+        void imguiSetupWindow();
+        void recreateImguiWindow();
+
+    private:
+       
         VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 
         void createSwapChain();

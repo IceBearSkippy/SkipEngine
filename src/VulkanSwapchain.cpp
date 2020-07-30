@@ -9,9 +9,10 @@ namespace Skip {
 
     VulkanSwapchain::VulkanSwapchain() {};
 
-    VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, SkipScene* scene) {
+    VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, VkInstance* instance, SkipScene* scene) {
         _vkDevice = vkDevice;
         _vkWindow = vkWindow;
+        _instance = instance;
         _scene = scene;
         _currentFrame = 0;
         this->createSwapChain();
@@ -34,6 +35,12 @@ namespace Skip {
         this->createDescriptorSets();
         this->createCommandBuffers();
         this->createSyncObjects();
+
+        this->initImgui();
+        if (!_isImGuiWindowCreated) {
+            this->imguiSetupWindow();
+            _isImGuiWindowCreated = true;
+        }
     };
 
     VulkanSwapchain::~VulkanSwapchain() {
@@ -148,6 +155,7 @@ namespace Skip {
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             _framebufferResized = false;
             recreateSwapChain();
+            recreateImguiWindow();
         } else if (result != VK_SUCCESS) {
             throw std::runtime_error("Failed to present swap chain image!");
         }
@@ -296,6 +304,75 @@ namespace Skip {
                     std::min(capabilities.maxImageExtent.height,
                         actualExtent.height));
             return actualExtent;
+        }
+    }
+    void VulkanSwapchain::initImgui() {
+
+        QueueFamilyIndices queueFamilyIndices = QueueFamilyIndices::findQueueFamilies(_vkDevice->_gpuInfo, _vkWindow->_surface);
+
+        // Setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+
+        // When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+        io.DisplaySize = ImVec2(_swapChainExtent.width, _swapChainExtent.height);
+        io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+
+        // Setup Platform/Renderer bindings
+        ImGui_ImplGlfw_InitForVulkan(_vkWindow->_glfw, true);
+        ImGui_ImplVulkan_InitInfo init_info = {};
+        init_info.Instance = *_instance;
+        init_info.PhysicalDevice = _vkDevice->getPhysicalDevice();
+        init_info.Device = *_vkDevice->getLogicalDevice();
+        init_info.QueueFamily = queueFamilyIndices.graphicsFamily.value();
+        init_info.Queue = _vkDevice->_queues.graphics;
+        init_info.PipelineCache = nullptr; // we don't have pipeline cache right now
+        init_info.DescriptorPool = _descriptorPool;
+        init_info.Allocator = nullptr;
+        init_info.MinImageCount = _swapChainImages.size();
+        init_info.ImageCount = _swapChainImages.size();
+        init_info.CheckVkResultFn = nullptr;
+        ImGui_ImplVulkan_Init(&init_info, _renderPass);
+
+        // Set color style
+        ImGui::StyleColorsDark();
+
+
+        VkCommandBuffer command_buffer = beginSingleTimeCommands();
+        //TODO debug font upload
+        ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
+        endSingleTimeCommands(command_buffer);
+        ImGui_ImplVulkan_DestroyFontUploadObjects();
+    }
+
+    void VulkanSwapchain::imguiSetupWindow() {
+        ImGuiIO& io = ImGui::GetIO();
+        ImGui_ImplVulkan_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+
+
+        ImGui::NewFrame();
+
+        ImGui::ShowDemoWindow();
+
+        ImGui::Render();
+
+    }
+
+    void VulkanSwapchain::recreateImguiWindow() {
+        if (!_isImGuiWindowCreated) {
+            ImGui_ImplVulkan_Shutdown();
+            ImGui_ImplGlfw_Shutdown();
+            ImGui::DestroyContext();
+            recreateSwapChain();
+            initImgui();
+            imguiSetupWindow();
+            _isImGuiWindowCreated = true;
         }
     }
 
@@ -1422,34 +1499,6 @@ namespace Skip {
         }
     }
 
-    void VulkanSwapchain::createImguiDescriptorPool() {
-        VkDescriptorPoolSize poolSizes[] =
-        {
-            { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-            { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
-        };
-
-        VkDescriptorPoolCreateInfo poolInfo = {};
-        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-        poolInfo.maxSets = 1000 * IM_ARRAYSIZE(poolSizes);
-        poolInfo.poolSizeCount = (uint32_t)IM_ARRAYSIZE(poolSizes);
-        poolInfo.pPoolSizes = poolSizes;
-
-        if (vkCreateDescriptorPool(*_vkDevice->getLogicalDevice(), &poolInfo, nullptr, &_imguiDescriptorPool) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create descriptor pool for imgui!");
-        }
-    }
-
     void VulkanSwapchain::createDescriptorSets() {
         // We'll create descriptor set for each SkipObject
 
@@ -1609,11 +1658,16 @@ namespace Skip {
 
 
             }
+
+            if (_isImGuiWindowCreated) {
+                ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), _commandBuffers[i]);
+            }
             vkCmdEndRenderPass(_commandBuffers[i]);
             if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to record command buffer!");
             }
         }
+        _isImGuiWindowCreated = false;
     }
 
     void VulkanSwapchain::createSyncObjects() {
@@ -1642,6 +1696,7 @@ namespace Skip {
         }
 
     }
+    
 
     static std::vector<char> readFile(const std::string& filename) {
         std::ifstream file(filename, std::ios::ate | std::ios::binary); // reads from the end
