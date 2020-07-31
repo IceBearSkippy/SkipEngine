@@ -46,7 +46,9 @@ namespace Skip {
     VulkanSwapchain::~VulkanSwapchain() {
 
         vkDeviceWaitIdle(*_vkDevice->getLogicalDevice());
-
+        ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
         this->cleanupSwapChain();
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
@@ -337,6 +339,7 @@ namespace Skip {
         init_info.MinImageCount = _swapChainImages.size();
         init_info.ImageCount = _swapChainImages.size();
         init_info.CheckVkResultFn = nullptr;
+        init_info.MSAASamples = _vkDevice->_gpuInfo->msaaSamples;
         ImGui_ImplVulkan_Init(&init_info, _renderPass);
 
         // Set color style
@@ -1489,7 +1492,7 @@ namespace Skip {
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.pPoolSizes = poolSizes.data();
-        poolInfo.maxSets = static_cast<uint32_t>(_swapChainImages.size());
+        poolInfo.maxSets = static_cast<uint32_t>(_swapChainImages.size()) + 1; // +1 for imgui
         // structure has optional flag to determine individual descriptor sets
         // can be freed or not: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
         poolInfo.flags = 0;
