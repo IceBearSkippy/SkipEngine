@@ -18,8 +18,9 @@
 #include <VulkanWindow.h>
 #include <objects/SkipObject.h>
 #include <imgui.h>
-#include <imgui/imgui_impl_vulkan.h>
-#include <imgui/imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
+#include <imgui_impl_glfw.h>
+
 namespace Skip {
 
     struct SwapchainDetails {
@@ -96,6 +97,15 @@ namespace Skip {
         void imguiSetupWindow();
         void recreateImguiWindow();
 
+        ImDrawData* _imguiDrawData;
+        static ImGui_ImplVulkanH_Window _imguiWindow;
+
+        // Required interaction with ImguiContext
+        uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+            VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+
+        VkShaderModule createShaderModule(const std::vector<char>& code);
     private:
        
         VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
@@ -112,14 +122,11 @@ namespace Skip {
 
         void createDescriptorSetLayout();
         void createGraphicsPipeline();
-        VkShaderModule createShaderModule(const std::vector<char>& code);
-
         void createCommandPool();
 
         void createColorResources();
         void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format,
             VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-        uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
         bool hasStencilComponent(VkFormat format);
 
         void createDepthResources();
@@ -130,8 +137,7 @@ namespace Skip {
 
         // We are managing multiple textures using ModelObject struct
         void createTextureImages();
-        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-            VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+        
         void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
         void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
         
