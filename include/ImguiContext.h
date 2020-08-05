@@ -39,15 +39,19 @@ namespace Skip {
         ~ImguiContext();
         void init(float width, float height);
         void initResources(VkRenderPass renderPass, VkQueue copyQueue, const std::string& shadersPath);
-        void newFrame(VulkanSwapchain* example, bool updateFrameGraph);
+        void newFrame(bool updateFrameGraph, float currentTime);
         void updateBuffers();
         void drawFrame(VkCommandBuffer commandBuffer);
 
     private:
         // Vulkan resources for rendering the UI
         VkSampler sampler;
-        vks::Buffer vertexBuffer;
-        vks::Buffer indexBuffer;
+        VkBuffer vertexBuffer;
+        VkDeviceMemory vertexBufferMemory;
+        void* vertMapped = nullptr;
+        VkBuffer indexBuffer;
+        VkDeviceMemory indexBufferMemory;
+        void* indexMapped = nullptr;
         int32_t vertexCount = 0;
         int32_t indexCount = 0;
         VkDeviceMemory fontMemory = VK_NULL_HANDLE;
@@ -61,5 +65,5 @@ namespace Skip {
         VkDescriptorSet descriptorSet;
         VulkanDevice* _vulkanDevice;
         VulkanSwapchain* _vulkanSwapchain;
-    }
+    };
 }
