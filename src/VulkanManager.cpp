@@ -42,8 +42,8 @@ namespace Skip {
         
     }
 
-    void VulkanManager::drawFrame(uint32_t currentImage) {
-        _vulkanSwapchain->drawFrame(currentImage);
+    void VulkanManager::drawFrame(uint32_t currentImage, float deltaTime) {
+        _vulkanSwapchain->drawFrame(currentImage, deltaTime);
     }
 
     bool VulkanManager::checkValidationLayerSupport() {

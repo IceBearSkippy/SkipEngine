@@ -46,7 +46,7 @@ namespace Skip {
 
         bool checkValidationLayerSupport();
 
-        void drawFrame(uint32_t currentImage);
+        void drawFrame(uint32_t currentImage, float deltaTime);
 
         VulkanWindow* _window;
         bool _enableValidationLayers;

@@ -34,12 +34,9 @@ find_package( glm REQUIRED )
 find_package( tinyobjloader REQUIRED )
 find_package( imgui REQUIRED )
 
-set ( IMGUI_LIB_PATH ${LIBS_FOLDER}/imgui )
-
 list ( APPEND PROJECT_INCLUDE_DIRECTORIES
   ${SOURCE_FOLDER}
   ${LIBS_FOLDER}
-  ${IMGUI_LIB_PATH}
   ${VULKAN_SDK}/include
   ${INCLUDE_FOLDER}
 )
@@ -49,13 +46,9 @@ file(COPY ${RESOURCES_FOLDER} DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${LIBS_FOLDER} DESTINATION ${CMAKE_BINARY_DIR})
 
 list ( APPEND PROJECT_EXECUTABLE_FILES
-  ${IMGUI_LIB_PATH}/imgui_impl_glfw.cpp
-  ${IMGUI_LIB_PATH}/imgui_impl_vulkan.cpp
-
   ${SOURCE_FOLDER}/VulkanWindow.cpp
   ${SOURCE_FOLDER}/VulkanDevice.cpp
   ${SOURCE_FOLDER}/VulkanSwapchain.cpp
-  ${SOURCE_FOLDER}/ImguiContext.cpp
   ${SOURCE_FOLDER}/objects/SkipObject.cpp
   ${SOURCE_FOLDER}/objects/Model.cpp
   ${SOURCE_FOLDER}/objects/Cube.cpp
