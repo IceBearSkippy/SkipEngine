@@ -48,6 +48,7 @@ file(COPY ${LIBS_FOLDER} DESTINATION ${CMAKE_BINARY_DIR})
 list ( APPEND PROJECT_EXECUTABLE_FILES
   ${SOURCE_FOLDER}/VulkanWindow.cpp
   ${SOURCE_FOLDER}/VulkanDevice.cpp
+  ${SOURCE_FOLDER}/ImguiContext.cpp
   ${SOURCE_FOLDER}/VulkanSwapchain.cpp
   ${SOURCE_FOLDER}/objects/SkipObject.cpp
   ${SOURCE_FOLDER}/objects/Model.cpp
