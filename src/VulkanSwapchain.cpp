@@ -36,6 +36,9 @@ namespace Skip {
         this->createDescriptorPool();
         this->createDescriptorSets();
         this->createSyncObjects();
+
+        this->initImgui();
+
         this->createCommandBuffers();
         
     };
@@ -44,8 +47,10 @@ namespace Skip {
 
         vkDeviceWaitIdle(*_vkDevice->getLogicalDevice());
         this->cleanupSwapChain();
-
+        
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        _imguiContext->DestroyImguiContext(logicalDevice);
+        
         for (size_t i = 0; i < _scene->_objects.size(); i++) {
             vkDestroySampler(logicalDevice, _scene->_objects[i]->_textureSampler, nullptr);
             vkDestroyImageView(logicalDevice, _scene->_objects[i]->_textureImageView, nullptr);
@@ -150,7 +155,6 @@ namespace Skip {
 
         // gives condition if presentation queue is optimal/suboptimal
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-            // TODO: Debug maximizing window with imgui
             _framebufferResized = false;
             recreateSwapChain();
         } else if (result != VK_SUCCESS) {
@@ -1502,6 +1506,10 @@ namespace Skip {
 
             }
 
+            // draw imguiContext frame
+            _imguiContext->drawFrame(_commandBuffers[i]);
+
+
             vkCmdEndRenderPass(_commandBuffers[i]);
             if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to record command buffer!");
@@ -1533,6 +1541,12 @@ namespace Skip {
                 throw std::runtime_error("Failed to create synchronization objects for a frame!");
             }
         }
+    }
+
+    void VulkanSwapchain::initImgui() {
+        _imguiContext = new ImguiContext();
+        _imguiContext->init((float)_swapChainExtent.width, (float)_swapChainExtent.height);
+        _imguiContext->initResources(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice(), _renderPass, _vkDevice->_queues.graphics, _commandPool, "resources/shaders/imgui");
     }
     
 }

@@ -3,7 +3,7 @@
 namespace Skip {
     // IMGUI Class
     ImguiContext::ImguiContext() {
-
+        ImGui::CreateContext();
     }
 
     ImguiContext::~ImguiContext() {
@@ -54,6 +54,7 @@ namespace Skip {
 
         // Create target image for copy
         VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
         imageInfo.extent.width = texWidth;
@@ -74,6 +75,7 @@ namespace Skip {
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.allocationSize = memRequirements.size;
         allocInfo.memoryTypeIndex = findMemoryType(physicalDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         if (vkAllocateMemory(device, &allocInfo, nullptr, &fontMemory) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate image memory");
         }
@@ -87,6 +89,7 @@ namespace Skip {
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.levelCount = 1;
         viewInfo.subresourceRange.layerCount = 1;
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         if (vkCreateImageView(device, &viewInfo, nullptr, &fontView) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create texture image view!");
         }
@@ -128,6 +131,7 @@ namespace Skip {
         imageMemoryBarrier.subresourceRange = subresourceRange;
         imageMemoryBarrier.srcAccessMask = 0;
         imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         // Put barrier inside setup command buffer
         vkCmdPipelineBarrier(
             copyCmd,
@@ -176,6 +180,7 @@ namespace Skip {
         imageMemoryBarrier.subresourceRange = subresourceRange;
         imageMemoryBarrier.srcAccessMask = 0;
         imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
         vkCmdPipelineBarrier(
             copyCmd,
             srcStageMask,
@@ -199,6 +204,7 @@ namespace Skip {
         samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         if (vkCreateSampler(device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create a texture sampler!");
         }
@@ -208,23 +214,27 @@ namespace Skip {
         };
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.maxSets = 2;
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create descriptor pool!");
         }
 
         // Descriptor set layout
-        std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings{};
-        setLayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        setLayoutBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        setLayoutBindings[0].binding = 0;
-        setLayoutBindings[0].descriptorCount = 1;
+        VkDescriptorSetLayoutBinding descriptorSetLayoutBindingInfo;
+        descriptorSetLayoutBindingInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorSetLayoutBindingInfo.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        descriptorSetLayoutBindingInfo.pImmutableSamplers = nullptr;
+        descriptorSetLayoutBindingInfo.binding = 0;
+        descriptorSetLayoutBindingInfo.descriptorCount = 1;
+        std::array<VkDescriptorSetLayoutBinding, 1> setLayoutBindings{ descriptorSetLayoutBindingInfo };
 
         VkDescriptorSetLayoutCreateInfo descriptorLayout{};
         descriptorLayout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        descriptorLayout.pBindings = setLayoutBindings.data();
         descriptorLayout.bindingCount = static_cast<uint32_t>(setLayoutBindings.size());
-
+        descriptorLayout.pBindings = setLayoutBindings.data();
+        
         if (vkCreateDescriptorSetLayout(device, &descriptorLayout, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create descriptor set layout!");
         }
@@ -406,8 +416,8 @@ namespace Skip {
 
         pipelineCreateInfo.pVertexInputState = &vertexInputState;
 
-        auto vertShaderCode = readFile("resources/shaders/imgui/ui.vert.spv");
-        auto fragShaderCode = readFile("resources/shaders/imgui/ui.frag.spv");
+        auto vertShaderCode = readFile(shadersPath + "/ui.vert.spv");
+        auto fragShaderCode = readFile(shadersPath + "/ui.frag.spv");
 
         VkShaderModule vertShaderModule = createShaderModule(device, vertShaderCode);
         VkShaderModule fragShaderModule = createShaderModule(device, fragShaderCode);

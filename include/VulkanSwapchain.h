@@ -37,8 +37,8 @@ namespace Skip {
 
         VulkanDevice* _vkDevice = nullptr;
         VulkanWindow* _vkWindow = nullptr;
-        //TODO Can now separate this out if I'm going to pass a swapchain for each method
-        //ImguiContext* _imguiContext = nullptr;
+
+        ImguiContext* _imguiContext = nullptr;
 
         float _frameTimer = 0.0f;
 
@@ -139,5 +139,7 @@ namespace Skip {
         void createDescriptorSets();
         void createCommandBuffers();
         void createSyncObjects();
+        
+        void initImgui();
     };
 }

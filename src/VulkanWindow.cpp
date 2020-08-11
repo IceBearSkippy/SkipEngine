@@ -71,6 +71,15 @@ namespace Skip {
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
+        if (keys[GLFW_MOUSE_BUTTON_LEFT]) {
+            mouseButtons.left = !mouseButtons.left;
+        }
+        if (keys[GLFW_MOUSE_BUTTON_MIDDLE]) {
+            mouseButtons.middle = !mouseButtons.middle;
+        }
+        if (keys[GLFW_MOUSE_BUTTON_RIGHT]) {
+            mouseButtons.right = !mouseButtons.right;
+        }
         if (keys[GLFW_KEY_W] || keys[GLFW_KEY_UP]) {
             _scene->_camera->ProcessKeyboard(FORWARD, deltaTime);
         }
@@ -121,5 +130,6 @@ namespace Skip {
 
             camera->ProcessMouseMovement(xOffset, yOffset);
         }
+        vulkanWindow->mousePos = glm::vec2(xPos, yPos);
     }
 }

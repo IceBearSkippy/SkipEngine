@@ -1,5 +1,5 @@
 #include <VulkanManager.h>
-
+#include <imgui.h>
 namespace Skip {
 
     
@@ -43,6 +43,15 @@ namespace Skip {
     }
 
     void VulkanManager::drawFrame(uint32_t currentImage, float deltaTime) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2((float)_vulkanSwapchain->_swapChainExtent.width, (float)_vulkanSwapchain->_swapChainExtent.height);
+        //TODO remove frametimer(?)
+        io.DeltaTime = deltaTime;
+
+        io.MousePos = ImVec2(_window->mousePos.x, _window->mousePos.y);
+        io.MouseDown[0] = _window->mouseButtons.left;
+        io.MouseDown[1] = _window->mouseButtons.right;
+
         _vulkanSwapchain->drawFrame(currentImage, deltaTime);
     }
 
