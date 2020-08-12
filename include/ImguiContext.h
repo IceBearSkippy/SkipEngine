@@ -35,23 +35,27 @@ namespace Skip {
             glm::vec2 scale;
             glm::vec2 translate;
         } pushConstBlock;
+
         ImguiContext();
         ~ImguiContext();
         void DestroyImguiContext(VkDevice device);
         void init(float width, float height);
-        void initResources(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkQueue copyQueue, VkCommandPool commandPool, const std::string& shadersPath);
+        void initResources(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkQueue copyQueue, VkCommandPool commandPool, const std::string& shadersPath, VkSampleCountFlagBits msaaSamples);
         void newFrame(std::string title, std::string gpuDeviceName, float frameTimer, bool updateFrameGraph, Camera* camera);
         void updateBuffers(VkDevice device, VkPhysicalDevice physicalDevice);
         void drawFrame(VkCommandBuffer commandBuffer);
 
+        VkPipelineLayout pipelineLayout;
+        VkPipeline pipeline;
+        VkDescriptorSet descriptorSet;
     private:
         // Vulkan resources for rendering the UI
         VkSampler sampler;
         VkBuffer vertexBuffer;
-        VkDeviceMemory vertexBufferMemory;
+        VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
         void* vertMapped = nullptr;
         VkBuffer indexBuffer;
-        VkDeviceMemory indexBufferMemory;
+        VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
         void* indexMapped = nullptr;
         int32_t vertexCount = 0;
         int32_t indexCount = 0;
@@ -59,11 +63,11 @@ namespace Skip {
         VkImage fontImage = VK_NULL_HANDLE;
         VkImageView fontView = VK_NULL_HANDLE;
         VkPipelineCache pipelineCache;
-        VkPipelineLayout pipelineLayout;
-        VkPipeline pipeline;
+        
+        
         VkDescriptorPool descriptorPool;
         VkDescriptorSetLayout descriptorSetLayout;
-        VkDescriptorSet descriptorSet;
+        
     };
 
     // TODO: Move these helper methods to new file

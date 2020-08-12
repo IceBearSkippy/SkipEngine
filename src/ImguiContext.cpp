@@ -13,10 +13,14 @@ namespace Skip {
     void ImguiContext::DestroyImguiContext(VkDevice device) {
         ImGui::DestroyContext();
 
-        vkDestroyBuffer(device, vertexBuffer, nullptr);
-        vkFreeMemory(device, vertexBufferMemory, nullptr);
-        vkDestroyBuffer(device, indexBuffer, nullptr);
-        vkFreeMemory(device, indexBufferMemory, nullptr);
+        if (vertexBufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, vertexBufferMemory, nullptr);
+            vkDestroyBuffer(device, vertexBuffer, nullptr);
+        }
+        if (indexBufferMemory != VK_NULL_HANDLE) {
+            vkFreeMemory(device, indexBufferMemory, nullptr);
+            vkDestroyBuffer(device, indexBuffer, nullptr);
+        }
 
         vkDestroyImage(device, fontImage, nullptr);
         vkDestroyImageView(device, fontView, nullptr);
@@ -43,7 +47,7 @@ namespace Skip {
         io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
     }
 
-    void ImguiContext::initResources(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkQueue copyQueue, VkCommandPool commandPool, const std::string& shadersPath) {
+    void ImguiContext::initResources(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkQueue copyQueue, VkCommandPool commandPool, const std::string& shadersPath, VkSampleCountFlagBits msaaSamples) {
         ImGuiIO& io = ImGui::GetIO();
 
         // Create font texture
@@ -276,8 +280,8 @@ namespace Skip {
         // Push constants for UI rendering parameters
         VkPushConstantRange pushConstantRange{};
         pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-        pushConstantRange.offset = sizeof(PushConstBlock);
-        pushConstantRange.size = 0;
+        pushConstantRange.offset = 0;
+        pushConstantRange.size = sizeof(PushConstBlock);
 
         VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
         pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -336,9 +340,17 @@ namespace Skip {
         viewportState.flags = 0;
 
         VkPipelineMultisampleStateCreateInfo multisampleState{};
+        //multisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        //multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        //multisampleState.flags = 0;
+
         multisampleState.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-        multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-        multisampleState.flags = 0;
+        multisampleState.sampleShadingEnable = VK_FALSE; // can enable if enabled from logical device
+        multisampleState.minSampleShading = 1.0f; // (0.2f) min fraction for simple shading; closer to one is smoother
+        multisampleState.rasterizationSamples = msaaSamples;
+        multisampleState.pSampleMask = nullptr; // optional
+        multisampleState.alphaToCoverageEnable = VK_FALSE; // optional
+        multisampleState.alphaToOneEnable = VK_FALSE; // optional
 
         std::vector<VkDynamicState> dynamicStateEnables = {
             VK_DYNAMIC_STATE_VIEWPORT,
@@ -389,15 +401,15 @@ namespace Skip {
 
         // Location 1: UV
         VkVertexInputAttributeDescription vInputAttribDescriptionUV{};
-        vInputAttribDescriptionUV.location = 0;
-        vInputAttribDescriptionUV.binding = 1;
+        vInputAttribDescriptionUV.location = 1;
+        vInputAttribDescriptionUV.binding = 0;
         vInputAttribDescriptionUV.format = VK_FORMAT_R32G32_SFLOAT;
         vInputAttribDescriptionUV.offset = offsetof(ImDrawVert, uv);
 
         // Location 2: Color
         VkVertexInputAttributeDescription vInputAttribDescriptionColor{};
-        vInputAttribDescriptionColor.location = 0;
-        vInputAttribDescriptionColor.binding = 2;
+        vInputAttribDescriptionColor.location = 2;
+        vInputAttribDescriptionColor.binding = 0;
         vInputAttribDescriptionColor.format = VK_FORMAT_R8G8B8A8_UNORM;
         vInputAttribDescriptionColor.offset = offsetof(ImDrawVert, col);
 
@@ -518,19 +530,21 @@ namespace Skip {
             }
 
             //vertexBuffer.destroy();
-            if (vertexBuffer) {
-                vkDestroyBuffer(device, vertexBuffer, nullptr);
-            }
             if (vertexBufferMemory) {
                 vkFreeMemory(device, vertexBufferMemory, nullptr);
+                vertexBufferMemory = VK_NULL_HANDLE;
             }
-            // Create the buffer handle
-            VkBufferCreateInfo bufferCreateInfo{};
-            bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-            bufferCreateInfo.size = vertexBufferSize;
+            if (vertexBuffer) {
+                //vkDestroyBuffer(device, vertexBuffer, nullptr);
+            }
 
-            if (vkCreateBuffer(device, &bufferCreateInfo, nullptr, &vertexBuffer) != VK_SUCCESS) {
+            // Create the buffer handle
+            VkBufferCreateInfo vertBufferCreateInfo{};
+            vertBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            vertBufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+            vertBufferCreateInfo.size = vertexBufferSize;
+
+            if (vkCreateBuffer(device, &vertBufferCreateInfo, nullptr, &vertexBuffer) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to create vertex buffer!");
             }
 
@@ -548,7 +562,8 @@ namespace Skip {
 
             // If a pointer to the buffer data has been passed, map the buffer and copy over the data
             void* data;
-            if (data != nullptr) {
+            // TODO: vertMapped resize issues
+            if (vertMapped != nullptr) {
                 vkMapMemory(device, vertexBufferMemory, 0, vertexBufferSize, 0, &vertMapped);
                 memcpy(vertMapped, data, vertexBufferSize);
                 if ((VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
@@ -580,19 +595,21 @@ namespace Skip {
             }
 
             //indexBuffer.destroy();
-            if (indexBuffer) {
-                vkDestroyBuffer(device, indexBuffer, nullptr);
-            }
             if (indexBufferMemory) {
                 vkFreeMemory(device, indexBufferMemory, nullptr);
+                indexBufferMemory = VK_NULL_HANDLE;
             }
+            if (indexBuffer) {
+                //vkDestroyBuffer(device, indexBuffer, nullptr);
+            }
+            
             // Create the buffer handle
-            VkBufferCreateInfo bufferCreateInfo{};
-            bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            bufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-            bufferCreateInfo.size = indexBufferSize;
+            VkBufferCreateInfo indexBufferCreateInfo{};
+            indexBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            indexBufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+            indexBufferCreateInfo.size = indexBufferSize;
 
-            if (vkCreateBuffer(device, &bufferCreateInfo, nullptr, &indexBuffer) != VK_SUCCESS) {
+            if (vkCreateBuffer(device, &indexBufferCreateInfo, nullptr, &indexBuffer) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to create vertex buffer!");
             }
 
@@ -610,7 +627,8 @@ namespace Skip {
 
             // If a pointer to the buffer data has been passed, map the buffer and copy over the data
             void* data;
-            if (data != nullptr) {
+            // TODO: indexMapped resize issues
+            if (indexMapped != nullptr) {
                 vkMapMemory(device, indexBufferMemory, 0, indexBufferSize, 0, &indexMapped);
                 memcpy(indexMapped, data, vertexBufferSize);
                 if ((VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {

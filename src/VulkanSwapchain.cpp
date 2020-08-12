@@ -784,8 +784,6 @@ namespace Skip {
         }
     }
 
-    
-
     void VulkanSwapchain::createColorResources() {
         VkFormat colorFormat = _swapChainImageFormat;
 
@@ -881,7 +879,6 @@ namespace Skip {
         } else {
             barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         }
-
 
         barrier.subresourceRange.baseMipLevel = 0;
         barrier.subresourceRange.levelCount = mipLevels;
@@ -1419,14 +1416,9 @@ namespace Skip {
 
     void VulkanSwapchain::createCommandBuffers() {
         _commandBuffers.resize(_swapChainFramebuffers.size());
-
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = _commandPool;
-        // levels can be primary or secondary
-        // primary - can be submitted to a queue for execution, but not called by other command buffers
-        // secondary - cannot be submitted directly, but can be called from primary command buffers
-        //             (useful for common operations from primary command buffers)
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t)_commandBuffers.size();
 
@@ -1434,20 +1426,17 @@ namespace Skip {
             throw std::runtime_error("Failed to allocate command buffers!");
         }
 
+        //TODO: IMGUI Create frame
+        //_imguiContext->newFrame("test", "GPU_NAME", _frameTimer, true, _scene->_camera);
+        //_imguiContext->updateBuffers(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice());
+        //_imguiContext->createCommandBuffers(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice());
+        this->createImguiCommandBuffers();
+
         // Command Buffer Recording
         for (size_t i = 0; i < _commandBuffers.size(); i++) {
             VkCommandBufferBeginInfo beginInfo{};
             beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            //flags specify how we're gonna use the command buffer
-            // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT - Command buffer will be rerecorded after executing once
-            // VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT - this is a secondary command buffer
-            //                                                    that will be entirely within a single render pass
-            // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT - Command buffer can be resubmitted while it
-            //                                                is also already pending execution
             beginInfo.flags = 0; // optional
-
-            // pInheritenceInfo only relevant for secondary command buffers
-            // specifies which state to inherit from the calling primary command buffer
             beginInfo.pInheritanceInfo = nullptr; // optional
 
             if (vkBeginCommandBuffer(_commandBuffers[i], &beginInfo) != VK_SUCCESS) {
@@ -1465,12 +1454,8 @@ namespace Skip {
             renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
             renderPassInfo.renderPass = _renderPass;
             renderPassInfo.framebuffer = _swapChainFramebuffers[i];
-
-            // size of render area. Where shader loads and stores will take place
-            // should match the size of attachments for best performance
             renderPassInfo.renderArea.offset = { 0, 0 };
             renderPassInfo.renderArea.extent = _swapChainExtent;
-
             renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
             renderPassInfo.pClearValues = clearValues.data();
 
@@ -1485,8 +1470,7 @@ namespace Skip {
             //Basic Drawing Commands
             vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
 
-
-
+            
             for (size_t j = 0; j < _scene->_objects.size(); j++) {
                 VkDeviceSize offsets[] = { 0 };
                 
@@ -1505,11 +1489,6 @@ namespace Skip {
                 }
 
             }
-
-            // draw imguiContext frame
-            _imguiContext->drawFrame(_commandBuffers[i]);
-
-
             vkCmdEndRenderPass(_commandBuffers[i]);
             if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to record command buffer!");
@@ -1517,6 +1496,77 @@ namespace Skip {
         }
     }
 
+    void VulkanSwapchain::createImguiCommandBuffers() {
+        
+
+        _imguiContext->newFrame("test", "GPU_NAME", _frameTimer, true, _scene->_camera);
+        _imguiContext->updateBuffers(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice());
+
+        for (int32_t i = 0; i < _commandBuffers.size(); ++i) {
+            VkCommandBufferBeginInfo cmdBufferBeginInfo{};
+            cmdBufferBeginInfo.pNext = nullptr;
+            cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            cmdBufferBeginInfo.flags = 0; // optional
+            cmdBufferBeginInfo.pInheritanceInfo = nullptr; // optional
+            if (vkBeginCommandBuffer(_commandBuffers[i], &cmdBufferBeginInfo) != VK_SUCCESS) {
+                throw std::runtime_error("Failed to begin recording command buffer!");
+            }
+
+            std::array<VkClearValue, 2> clearValues;
+            clearValues[0].color = { { 0.2f, 0.2f, 0.2f, 1.0f} };
+            clearValues[1].depthStencil = { 1.0f, 0 };
+
+            VkRenderPassBeginInfo renderPassBeginInfo{};
+            renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+            renderPassBeginInfo.renderPass = _renderPass;
+            renderPassBeginInfo.renderArea.offset = { 0, 0 };
+            renderPassBeginInfo.renderArea.extent = _swapChainExtent;
+            renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+            renderPassBeginInfo.pClearValues = clearValues.data();
+            renderPassBeginInfo.framebuffer = _swapChainFramebuffers[i];
+
+            
+            vkCmdBeginRenderPass(_commandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+            VkViewport viewport{};
+            viewport.width = _swapChainExtent.width;
+            viewport.height = _swapChainExtent.height;
+            viewport.minDepth = 0.0f;
+            viewport.maxDepth = 1.0f;
+            vkCmdSetViewport(_commandBuffers[i], 0, 1, &viewport);
+
+            VkRect2D scissor{};
+            scissor.extent.width = _swapChainExtent.width;
+            scissor.extent.height = _swapChainExtent.height;
+            scissor.offset.x = 0;
+            scissor.offset.y = 0;
+            vkCmdSetScissor(_commandBuffers[i], 0, 1, &scissor);
+
+            // Render scene
+            vkCmdBindDescriptorSets(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _imguiContext->pipelineLayout, 0, 1, &_imguiContext->descriptorSet, 0, nullptr);
+            vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _imguiContext->pipeline);
+
+            VkDeviceSize offsets[1] = { 0 };
+            /*if (uiSettings.displayBackground) {
+                models.background.draw(drawCmdBuffers[i]);
+            }
+
+            if (uiSettings.displayModels) {
+                models.models.draw(drawCmdBuffers[i]);
+            }
+
+            if (uiSettings.displayLogos) {
+                models.logos.draw(drawCmdBuffers[i]);
+            }*/
+
+            // Render imGui
+            _imguiContext->drawFrame(_commandBuffers[i]);
+
+            vkCmdEndRenderPass(_commandBuffers[i]);
+
+            vkEndCommandBuffer(_commandBuffers[i]);
+        }
+    }
     void VulkanSwapchain::createSyncObjects() {
         _imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         _renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1546,7 +1596,7 @@ namespace Skip {
     void VulkanSwapchain::initImgui() {
         _imguiContext = new ImguiContext();
         _imguiContext->init((float)_swapChainExtent.width, (float)_swapChainExtent.height);
-        _imguiContext->initResources(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice(), _renderPass, _vkDevice->_queues.graphics, _commandPool, "resources/shaders/imgui");
+        _imguiContext->initResources(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice(), _renderPass, _vkDevice->_queues.graphics, _commandPool, "resources/shaders/imgui", _vkDevice->_gpuInfo->msaaSamples);
     }
     
 }
