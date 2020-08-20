@@ -20,9 +20,14 @@ namespace Skip {
         this->createSwapChain();
         this->createImageViews();
         this->createRenderPass();
+        this->createPipelineCache();
         this->createDescriptorSetLayout();
-        this->createGraphicsPipeline();
         this->createCommandPool();
+
+        this->createGraphicsPipeline();
+
+        this->initImgui();
+
         this->createColorResources();
         this->createDepthResources();
         this->createFramebuffers();
@@ -36,8 +41,6 @@ namespace Skip {
         this->createDescriptorPool();
         this->createDescriptorSets();
         this->createSyncObjects();
-
-        this->initImgui();
 
         this->createCommandBuffers();
         
@@ -73,7 +76,7 @@ namespace Skip {
             vkDestroySemaphore(logicalDevice, _imageAvailableSemaphores[i], nullptr);
             vkDestroyFence(logicalDevice, _inFlightFences[i], nullptr);
         }
-
+        vkDestroyPipelineCache(logicalDevice, _pipelineCache, nullptr);
         vkDestroyCommandPool(logicalDevice, _commandPool, nullptr);
         vkDestroyDevice(logicalDevice, nullptr);
     };
@@ -126,6 +129,9 @@ namespace Skip {
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
 
+        // TODO find appropriate placement for drawing imguiContext frame
+        _imguiContext->drawFrame(_commandBuffers[currentImage]);
+
         // reset fence before using it
         vkResetFences(logicalDevice, 1, &_inFlightFences[_currentFrame]);
         if (vkQueueSubmit(_vkDevice->_queues.graphics, 1, &submitInfo, _inFlightFences[_currentFrame]) != VK_SUCCESS) {
@@ -162,6 +168,7 @@ namespace Skip {
         }
 
         _currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+
     }
 
     void VulkanSwapchain::updateUniformBuffers(uint32_t currentImage) {
@@ -180,6 +187,13 @@ namespace Skip {
         }
     }
 
+    void VulkanSwapchain::createPipelineCache() {
+        VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+        pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+        if (vkCreatePipelineCache(*_vkDevice->getLogicalDevice(), &pipelineCacheCreateInfo, nullptr, &_pipelineCache) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create pipeline cache!");
+        }
+    }
 
     // recreateSwapChain is called when we draw frames
     void VulkanSwapchain::recreateSwapChain() {
@@ -573,9 +587,6 @@ namespace Skip {
     }
 
     void VulkanSwapchain::createGraphicsPipeline() {
-        //TODO: refactor to compile inline for .vert and .frag as initial setup?
-        //      Could also pass in file paths to read into this functions
-        //
         // Builds the following member variables:
         //     _pipelineLayout
         //     _graphicsPipeline
@@ -605,8 +616,10 @@ namespace Skip {
         fragShaderStageInfo.pName = "main";
         fragShaderStageInfo.pSpecializationInfo = nullptr;
 
-        VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
-
+        std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages { 
+            vertShaderStageInfo,
+            fragShaderStageInfo
+        };
         // create vertex input
         auto bindingDescription = Vertex::getBindingDescription();
         auto attributeDescriptions = Vertex::getAttributeDescriptions();
@@ -652,7 +665,6 @@ namespace Skip {
         rasterizer.depthClampEnable = VK_FALSE;
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-
         rasterizer.lineWidth = 1.0f;
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -704,7 +716,7 @@ namespace Skip {
         // dynamic states -- not included currently
         VkDynamicState dynamicStates[] = {
             VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_LINE_WIDTH
+            VK_DYNAMIC_STATE_SCISSOR
         };
 
         VkPipelineDynamicStateCreateInfo dynamicState{};
@@ -741,8 +753,8 @@ namespace Skip {
         // create Graphics Pipeline
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        pipelineInfo.stageCount = 2; // what is this for?
-        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size()); // what is this for?
+        pipelineInfo.pStages = shaderStages.data();
 
         pipelineInfo.pVertexInputState = &vertexInputInfo;
         pipelineInfo.pInputAssemblyState = &inputAssembly;
@@ -751,7 +763,7 @@ namespace Skip {
         pipelineInfo.pMultisampleState = &multisampling;
         pipelineInfo.pDepthStencilState = &depthStencil; // optional
         pipelineInfo.pColorBlendState = &colorBlending;
-        pipelineInfo.pDynamicState = nullptr; // optional
+        pipelineInfo.pDynamicState = &dynamicState; // optional
 
         pipelineInfo.layout = _pipelineLayout;
         pipelineInfo.renderPass = _renderPass;
@@ -760,8 +772,8 @@ namespace Skip {
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // optional -- can switch between pipelines, but right now there's only one
         pipelineInfo.basePipelineIndex = -1; // optional
 
-        if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1,
-            &pipelineInfo, nullptr, &_graphicsPipeline) != VK_SUCCESS) {
+        //TODO Look over pipeline cache and try this out
+        if (vkCreateGraphicsPipelines(logicalDevice, _pipelineCache, 1, &pipelineInfo, nullptr, &_graphicsPipeline) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create graphics pipeline!");
         }
 
@@ -775,10 +787,7 @@ namespace Skip {
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-        // there are two flags:
-        // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT - command buffers are rerecorded with new commands ofter (memory allocation behavior may change)
-        // VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT - command buffers to be rerecorded individually, without this flag, they all have to be reset together
-        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT; // Needed because imgui needs to call vkResetCommandPool each frame
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
         if (vkCreateCommandPool(*_vkDevice->getLogicalDevice(), &poolInfo, nullptr, &_commandPool) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create command pool!");
         }
@@ -1415,61 +1424,66 @@ namespace Skip {
     }
 
     void VulkanSwapchain::createCommandBuffers() {
+        // TODO: can move creation of command buffers out for reuse
         _commandBuffers.resize(_swapChainFramebuffers.size());
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = _commandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t)_commandBuffers.size();
-
         if (vkAllocateCommandBuffers(*_vkDevice->getLogicalDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate command buffers!");
         }
 
-        //TODO: IMGUI Create frame
-        //_imguiContext->newFrame("test", "GPU_NAME", _frameTimer, true, _scene->_camera);
-        //_imguiContext->updateBuffers(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice());
-        //_imguiContext->createCommandBuffers(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice());
-        this->createImguiCommandBuffers();
+
+        std::array<VkClearValue, 2> clearValues{};
+        clearValues[0] = { 0.0f, 0.0f, 0.0f, 1.0f };
+        clearValues[1].depthStencil = { 1.0f, 0 };
+
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = _renderPass;
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = _swapChainExtent;
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = 0; // optional
+        beginInfo.pInheritanceInfo = nullptr; // optional
+
+        _imguiContext->newFrame("test", "GPU_NAME", _frameTimer, true, _scene->_camera);
+        _imguiContext->updateBuffers(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice());
 
         // Command Buffer Recording
         for (size_t i = 0; i < _commandBuffers.size(); i++) {
-            VkCommandBufferBeginInfo beginInfo{};
-            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            beginInfo.flags = 0; // optional
-            beginInfo.pInheritanceInfo = nullptr; // optional
+
+            renderPassInfo.framebuffer = _swapChainFramebuffers[i];
 
             if (vkBeginCommandBuffer(_commandBuffers[i], &beginInfo) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to begin recording command buffer!");
             }
-
-            // define clear values for VK_ATTACHMENT_LOAD_OP_CLEAR
-            // we use black with 100% opacity
-            std::array<VkClearValue, 2> clearValues{};
-            clearValues[0] = { 0.0f, 0.0f, 0.0f, 1.0f };
-            clearValues[1].depthStencil = { 1.0f, 0 };
-
-            // Render Pass
-            VkRenderPassBeginInfo renderPassInfo{};
-            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassInfo.renderPass = _renderPass;
-            renderPassInfo.framebuffer = _swapChainFramebuffers[i];
-            renderPassInfo.renderArea.offset = { 0, 0 };
-            renderPassInfo.renderArea.extent = _swapChainExtent;
-            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-            renderPassInfo.pClearValues = clearValues.data();
-
-            // final parameter controls how the drawing commands within the render
-            // pass will be provided:
-            // VK_SUBPASS_CONTENTS_INLINE: render pass commands will be embedded in primary cmd
-            //                             buffer and no secondary cmd buffers will be executed
-            // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: render pass cmds will be executed
-            //                                                from secondary command buffers
+            
             vkCmdBeginRenderPass(_commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-            //Basic Drawing Commands
-            vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
+            VkViewport viewport{};
+            viewport.width = _swapChainExtent.width;
+            viewport.height = _swapChainExtent.height;
+            viewport.minDepth = 0.0f;
+            viewport.maxDepth = 1.0f;
+            vkCmdSetViewport(_commandBuffers[i], 0, 1, &viewport);
 
+            VkRect2D scissor{};
+            scissor.extent.width = _swapChainExtent.width;
+            scissor.extent.height = _swapChainExtent.height;
+            scissor.offset.x = 0;
+            scissor.offset.y = 0;
+            vkCmdSetScissor(_commandBuffers[i], 0, 1, &scissor);
+
+            //Basic Drawing Commands
+            vkCmdBindDescriptorSets(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1, &_descriptorSets[i], 0, nullptr);
+            vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
             
             for (size_t j = 0; j < _scene->_objects.size(); j++) {
                 VkDeviceSize offsets[] = { 0 };
@@ -1489,6 +1503,9 @@ namespace Skip {
                 }
 
             }
+
+            _imguiContext->drawFrame(_commandBuffers[i]);
+
             vkCmdEndRenderPass(_commandBuffers[i]);
             if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to record command buffer!");
@@ -1496,77 +1513,6 @@ namespace Skip {
         }
     }
 
-    void VulkanSwapchain::createImguiCommandBuffers() {
-        
-
-        _imguiContext->newFrame("test", "GPU_NAME", _frameTimer, true, _scene->_camera);
-        _imguiContext->updateBuffers(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice());
-
-        for (int32_t i = 0; i < _commandBuffers.size(); ++i) {
-            VkCommandBufferBeginInfo cmdBufferBeginInfo{};
-            cmdBufferBeginInfo.pNext = nullptr;
-            cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            cmdBufferBeginInfo.flags = 0; // optional
-            cmdBufferBeginInfo.pInheritanceInfo = nullptr; // optional
-            if (vkBeginCommandBuffer(_commandBuffers[i], &cmdBufferBeginInfo) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to begin recording command buffer!");
-            }
-
-            std::array<VkClearValue, 2> clearValues;
-            clearValues[0].color = { { 0.2f, 0.2f, 0.2f, 1.0f} };
-            clearValues[1].depthStencil = { 1.0f, 0 };
-
-            VkRenderPassBeginInfo renderPassBeginInfo{};
-            renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassBeginInfo.renderPass = _renderPass;
-            renderPassBeginInfo.renderArea.offset = { 0, 0 };
-            renderPassBeginInfo.renderArea.extent = _swapChainExtent;
-            renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-            renderPassBeginInfo.pClearValues = clearValues.data();
-            renderPassBeginInfo.framebuffer = _swapChainFramebuffers[i];
-
-            
-            vkCmdBeginRenderPass(_commandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-            VkViewport viewport{};
-            viewport.width = _swapChainExtent.width;
-            viewport.height = _swapChainExtent.height;
-            viewport.minDepth = 0.0f;
-            viewport.maxDepth = 1.0f;
-            vkCmdSetViewport(_commandBuffers[i], 0, 1, &viewport);
-
-            VkRect2D scissor{};
-            scissor.extent.width = _swapChainExtent.width;
-            scissor.extent.height = _swapChainExtent.height;
-            scissor.offset.x = 0;
-            scissor.offset.y = 0;
-            vkCmdSetScissor(_commandBuffers[i], 0, 1, &scissor);
-
-            // Render scene
-            vkCmdBindDescriptorSets(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _imguiContext->pipelineLayout, 0, 1, &_imguiContext->descriptorSet, 0, nullptr);
-            vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _imguiContext->pipeline);
-
-            VkDeviceSize offsets[1] = { 0 };
-            /*if (uiSettings.displayBackground) {
-                models.background.draw(drawCmdBuffers[i]);
-            }
-
-            if (uiSettings.displayModels) {
-                models.models.draw(drawCmdBuffers[i]);
-            }
-
-            if (uiSettings.displayLogos) {
-                models.logos.draw(drawCmdBuffers[i]);
-            }*/
-
-            // Render imGui
-            _imguiContext->drawFrame(_commandBuffers[i]);
-
-            vkCmdEndRenderPass(_commandBuffers[i]);
-
-            vkEndCommandBuffer(_commandBuffers[i]);
-        }
-    }
     void VulkanSwapchain::createSyncObjects() {
         _imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         _renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);

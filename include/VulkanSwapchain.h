@@ -53,6 +53,7 @@ namespace Skip {
         VkRenderPass _imguiRenderPass;
         VkDescriptorSetLayout _descriptorSetLayout;
         VkPipelineLayout _pipelineLayout;
+        VkPipelineCache _pipelineCache;
         VkPipeline _graphicsPipeline;
         VkCommandPool _commandPool;
         VkImage _colorImage;
@@ -101,6 +102,7 @@ namespace Skip {
             uint32_t mipLevels);
 
         void createRenderPass();
+        void createPipelineCache();
         VkFormat findDepthFormat();
         VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, 
             VkFormatFeatureFlags features);
@@ -138,7 +140,6 @@ namespace Skip {
         void createDescriptorPool();
         void createDescriptorSets();
         void createCommandBuffers();
-        void createImguiCommandBuffers();
         void createSyncObjects();
         
         void initImgui();
