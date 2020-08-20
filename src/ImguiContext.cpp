@@ -2,6 +2,7 @@
 
 namespace Skip {
     // IMGUI Class
+    bool show_demo_window = true;
     ImguiContext::ImguiContext() {
         ImGui::CreateContext();
     }
@@ -258,7 +259,6 @@ namespace Skip {
         fontDescriptor.imageView = fontView;
         fontDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-
         VkWriteDescriptorSet writeDescriptorSet{};
         writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writeDescriptorSet.dstSet = descriptorSet;
@@ -438,9 +438,7 @@ namespace Skip {
         vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
         vertShaderStageInfo.module = vertShaderModule;
-
         vertShaderStageInfo.pName = "main";
-
         vertShaderStageInfo.pSpecializationInfo = nullptr;
 
         VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
@@ -456,23 +454,23 @@ namespace Skip {
             throw std::runtime_error("Failed to create imgui graphics pipeline!");
         }
     }
-
+    
     // Starts a new imGui frame and sets up windows and ui elements
     void ImguiContext::newFrame(std::string title, std::string gpuDeviceName, float frameTimer, bool updateFrameGraph, Camera* camera) {
+        
         ImGui::NewFrame();
-
         // Init imGui windows and elements
 
         ImVec4 clear_color = ImColor(114, 144, 154);
-        static float f = 0.0f;
-        ImGui::TextUnformatted(title.c_str());
-        ImGui::TextUnformatted(gpuDeviceName.c_str());
+        //static float f = 0.0f;
+        //ImGui::TextUnformatted(title.c_str());
+        //ImGui::TextUnformatted(gpuDeviceName.c_str());
 
         //ImGui::TextUnformatted(vulkanSwapchain->_vkWindow->_title.c_str());
         //ImGui::TextUnformatted(vulkanSwapchain->_vkDevice->_gpuInfo->properties.deviceName);
 
         // Update frame time display
-        if (updateFrameGraph) {
+        /*if (updateFrameGraph) {
             std::rotate(uiSettings.frameTimes.begin(), uiSettings.frameTimes.begin() + 1, uiSettings.frameTimes.end());
             float frameTime = 1000.0f / (frameTimer * 1000.0f);
             uiSettings.frameTimes.back() = frameTime;
@@ -482,9 +480,9 @@ namespace Skip {
             if (frameTime > uiSettings.frameTimeMax) {
                 uiSettings.frameTimeMax = frameTime;
             }
-        }
+        }*/
 
-        ImGui::PlotLines("Frame Times", &uiSettings.frameTimes[0], 50, 0, "", uiSettings.frameTimeMin, uiSettings.frameTimeMax, ImVec2(0, 80));
+        /*ImGui::PlotLines("Frame Times", &uiSettings.frameTimes[0], 50, 0, "", uiSettings.frameTimeMin, uiSettings.frameTimeMax, ImVec2(0, 80));
 
         ImGui::Text("Camera");
 
@@ -501,9 +499,27 @@ namespace Skip {
         ImGui::End();
 
         ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiCond_FirstUseEver);
-        ImGui::ShowDemoWindow();
+        ImGui::ShowDemoWindow(&show_demo_window);*/
 
-        // Render to generate draw buffers
+        static float f = 0.0f;
+        static int counter = 0;
+        ImGui::TextUnformatted("afewwfgw");
+        ImGui::TextUnformatted("PLS");
+        ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::Begin("Vulkan Example", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+
+        ImGui::SetWindowSize(ImVec2(200, 150), ImGuiCond_FirstUseEver);
+        ImGui::SetWindowPos(ImVec2(650, 250));
+
+        ImGui::Text("Debug information");
+        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+        //ImGui::Checkbox("Render models", &uiSettings.display_models);
+
+        ImGui::End();
+
+        ImGui::SetNextWindowPos(ImVec2(650, 350), ImGuiCond_FirstUseEver);
+        ImGui::ShowDemoWindow(&show_demo_window);
         ImGui::Render();
     }
 
@@ -690,8 +706,8 @@ namespace Skip {
 
         //VkViewport viewport = vks::initializers::viewport(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y, 0.0f, 1.0f);
         VkViewport viewport{};
-        viewport.width = ImGui::GetIO().DisplaySize.x;
-        viewport.height = ImGui::GetIO().DisplaySize.y;
+        viewport.width = io.DisplaySize.x;
+        viewport.height = io.DisplaySize.y;
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(commandBuffer, 0, 1, &viewport);

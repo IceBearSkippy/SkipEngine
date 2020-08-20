@@ -48,6 +48,7 @@ namespace Skip {
         VkPipelineLayout pipelineLayout;
         VkPipeline pipeline;
         VkDescriptorSet descriptorSet;
+        VkPipelineCache pipelineCache;
     private:
         // Vulkan resources for rendering the UI
         VkSampler sampler;
@@ -62,7 +63,7 @@ namespace Skip {
         VkDeviceMemory fontMemory = VK_NULL_HANDLE;
         VkImage fontImage = VK_NULL_HANDLE;
         VkImageView fontView = VK_NULL_HANDLE;
-        VkPipelineCache pipelineCache;
+        
         
         
         VkDescriptorPool descriptorPool;
