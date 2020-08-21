@@ -578,7 +578,6 @@ namespace Skip {
 
             // If a pointer to the buffer data has been passed, map the buffer and copy over the data
             void* data;
-            // TODO: vertMapped resize issues
             if (vertMapped != nullptr) {
                 vkMapMemory(device, vertexBufferMemory, 0, vertexBufferSize, 0, &vertMapped);
                 memcpy(vertMapped, data, vertexBufferSize);
@@ -626,7 +625,7 @@ namespace Skip {
             indexBufferCreateInfo.size = indexBufferSize;
 
             if (vkCreateBuffer(device, &indexBufferCreateInfo, nullptr, &indexBuffer) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to create vertex buffer!");
+                throw std::runtime_error("Failed to create index buffer!");
             }
 
             // Create the memory backing up the buffer handle
@@ -643,10 +642,9 @@ namespace Skip {
 
             // If a pointer to the buffer data has been passed, map the buffer and copy over the data
             void* data;
-            // TODO: indexMapped resize issues
             if (indexMapped != nullptr) {
                 vkMapMemory(device, indexBufferMemory, 0, indexBufferSize, 0, &indexMapped);
-                memcpy(indexMapped, data, vertexBufferSize);
+                memcpy(indexMapped, data, indexBufferSize);
                 if ((VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
                     VkMappedMemoryRange mappedRange = {};
                     mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
@@ -662,9 +660,9 @@ namespace Skip {
                 }
             }
             vkBindBufferMemory(device, indexBuffer, indexBufferMemory, 0);
-            indexCount = imDrawData->TotalVtxCount;
+            indexCount = imDrawData->TotalIdxCount;
             //indexBuffer.map();
-            vkMapMemory(device, vertexBufferMemory, 0, vertexBufferSize, 0, &indexMapped);
+            vkMapMemory(device, indexBufferMemory, 0, indexBufferSize, 0, &indexMapped);
         }
 
 
@@ -686,7 +684,7 @@ namespace Skip {
         mappedRangeVert.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
         mappedRangeVert.memory = vertexBufferMemory;
         mappedRangeVert.offset = 0;
-        mappedRangeVert.size = vertexBufferSize;
+        mappedRangeVert.size = VK_WHOLE_SIZE;
         vkFlushMappedMemoryRanges(device, 1, &mappedRangeVert);
 
         //indexBuffer.flush();
@@ -694,7 +692,7 @@ namespace Skip {
         mappedRangeIndex.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
         mappedRangeIndex.memory = indexBufferMemory;
         mappedRangeIndex.offset = 0;
-        mappedRangeIndex.size = indexBufferSize;
+        mappedRangeIndex.size = VK_WHOLE_SIZE;
         vkFlushMappedMemoryRanges(device, 1, &mappedRangeIndex);
     }
 

@@ -42,7 +42,8 @@ namespace Skip {
         this->createDescriptorSets();
         this->createSyncObjects();
 
-        this->createCommandBuffers();
+        this->allocateCommandBuffers();
+        this->buildCommandBuffers();
         
     };
 
@@ -104,6 +105,7 @@ namespace Skip {
     }
 
     void VulkanSwapchain::drawFrame(uint32_t currentImage, float deltaTime) {
+        this->buildCommandBuffers();
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
 
         _frameTimer = (float)deltaTime / 1000.0f;
@@ -128,9 +130,6 @@ namespace Skip {
         VkSemaphore signalSemaphores[] = { _renderFinishedSemaphores[_currentFrame] };
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = signalSemaphores;
-
-        // TODO find appropriate placement for drawing imguiContext frame
-        _imguiContext->drawFrame(_commandBuffers[currentImage]);
 
         // reset fence before using it
         vkResetFences(logicalDevice, 1, &_inFlightFences[_currentFrame]);
@@ -218,7 +217,8 @@ namespace Skip {
         this->createUniformBuffers();
         this->createDescriptorPool();
         this->createDescriptorSets();
-        this->createCommandBuffers();
+        this->allocateCommandBuffers();
+        this->buildCommandBuffers();
 
     }
 
@@ -772,7 +772,6 @@ namespace Skip {
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // optional -- can switch between pipelines, but right now there's only one
         pipelineInfo.basePipelineIndex = -1; // optional
 
-        //TODO Look over pipeline cache and try this out
         if (vkCreateGraphicsPipelines(logicalDevice, _pipelineCache, 1, &pipelineInfo, nullptr, &_graphicsPipeline) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create graphics pipeline!");
         }
@@ -862,6 +861,7 @@ namespace Skip {
 
     void VulkanSwapchain::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
         VkImageLayout newLayout, uint32_t mipLevels) {
+        // TODO: Add to imgui context as "helper function" -- will be a separate file soon for initializers
         VkDevice device = *_vkDevice->getLogicalDevice();
         VkPhysicalDevice physicalDevice = _vkDevice->getPhysicalDevice();
         VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, _commandPool);
@@ -1423,8 +1423,7 @@ namespace Skip {
         }
     }
 
-    void VulkanSwapchain::createCommandBuffers() {
-        // TODO: can move creation of command buffers out for reuse
+    void VulkanSwapchain::allocateCommandBuffers() {
         _commandBuffers.resize(_swapChainFramebuffers.size());
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1434,7 +1433,9 @@ namespace Skip {
         if (vkAllocateCommandBuffers(*_vkDevice->getLogicalDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate command buffers!");
         }
+    }
 
+    void VulkanSwapchain::buildCommandBuffers() {
 
         std::array<VkClearValue, 2> clearValues{};
         clearValues[0] = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -1454,6 +1455,7 @@ namespace Skip {
         beginInfo.pInheritanceInfo = nullptr; // optional
 
         _imguiContext->newFrame("test", "GPU_NAME", _frameTimer, true, _scene->_camera);
+        
         _imguiContext->updateBuffers(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice());
 
         // Command Buffer Recording

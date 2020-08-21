@@ -45,7 +45,6 @@ namespace Skip {
     void VulkanManager::drawFrame(uint32_t currentImage, float deltaTime) {
         ImGuiIO& io = ImGui::GetIO();
         io.DisplaySize = ImVec2((float)_vulkanSwapchain->_swapChainExtent.width, (float)_vulkanSwapchain->_swapChainExtent.height);
-        //TODO remove frametimer(?)
         io.DeltaTime = deltaTime;
 
         io.MousePos = ImVec2(_window->mousePos.x, _window->mousePos.y);
@@ -53,6 +52,8 @@ namespace Skip {
         io.MouseDown[1] = _window->mouseButtons.right;
 
         _vulkanSwapchain->drawFrame(currentImage, deltaTime);
+        
+
     }
 
     bool VulkanManager::checkValidationLayerSupport() {

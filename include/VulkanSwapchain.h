@@ -139,7 +139,8 @@ namespace Skip {
         void createUniformBuffers();
         void createDescriptorPool();
         void createDescriptorSets();
-        void createCommandBuffers();
+        void allocateCommandBuffers();
+        void buildCommandBuffers();
         void createSyncObjects();
         
         void initImgui();
