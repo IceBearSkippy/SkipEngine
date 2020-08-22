@@ -27,6 +27,29 @@ namespace Skip {
         float lightTimer = 0.0f;
     };
 
+    // TODO add to initializer class
+    struct Buffer {
+        VkDevice device;
+        VkBuffer buffer = VK_NULL_HANDLE;
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+        VkDescriptorBufferInfo descriptor;
+        VkDeviceSize size = 0;
+        VkDeviceSize alignment = 0;
+        void* mapped = nullptr;
+        /** @brief Usage flags to be filled by external source at buffer creation (to query at some later point) */
+        VkBufferUsageFlags usageFlags;
+        /** @brief Memory property flags to be filled by external source at buffer creation (to query at some later point) */
+        VkMemoryPropertyFlags memoryPropertyFlags;
+        void map(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+        void unmap();
+        VkResult bind(VkDeviceSize offset = 0);
+        void setupDescriptor(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+        void copyTo(void* data, VkDeviceSize size);
+        VkResult flush(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+        VkResult invalidate(VkDeviceSize size = VK_WHOLE_SIZE, VkDeviceSize offset = 0);
+        void destroy();
+    };
+
     // IMGUI Class
     class ImguiContext {
     public:
@@ -52,12 +75,8 @@ namespace Skip {
     private:
         // Vulkan resources for rendering the UI
         VkSampler sampler;
-        VkBuffer vertexBuffer;
-        VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
-        void* vertMapped = nullptr;
-        VkBuffer indexBuffer;
-        VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
-        void* indexMapped = nullptr;
+        Buffer vertexBuffer;
+        Buffer indexBuffer;
         int32_t vertexCount = 0;
         int32_t indexCount = 0;
         VkDeviceMemory fontMemory = VK_NULL_HANDLE;
@@ -74,10 +93,38 @@ namespace Skip {
     // TODO: Move these helper methods to new file
     std::vector<char> readFile(const std::string& filename);
     uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
-    void createBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-        VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-
+    
     VkCommandBuffer beginSingleTimeCommands(VkDevice device, VkCommandPool commandPool);
     void endSingleTimeCommands(VkDevice device, VkQueue queue, VkCommandPool commandPool, VkCommandBuffer commandBuffer);
     VkShaderModule createShaderModule(VkDevice device, const std::vector<char>& code);
+
+    void transitionImageLayout(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue queue,
+        VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
+
+    bool hasStencilComponent(VkFormat format);
+
+    void setImageLayout(
+        VkCommandBuffer cmdbuffer,
+        VkImage image,
+        VkImageAspectFlags aspectMask,
+        VkImageLayout oldImageLayout,
+        VkImageLayout newImageLayout,
+        VkPipelineStageFlags srcStageMask,
+        VkPipelineStageFlags dstStageMask);
+
+    void setImageLayout(
+        VkCommandBuffer cmdbuffer,
+        VkImage image,
+        VkImageLayout oldImageLayout,
+        VkImageLayout newImageLayout,
+        VkImageSubresourceRange subresourceRange,
+        VkPipelineStageFlags srcStageMask,
+        VkPipelineStageFlags dstStageMask);
+
+
+    void createBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+        VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+
+    VkResult createBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags,
+        Skip::Buffer* buffer, VkDeviceSize size, void* data = nullptr);
 }

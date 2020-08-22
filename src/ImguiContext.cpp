@@ -1,6 +1,61 @@
 #include <ImguiContext.h>
 
 namespace Skip {
+
+
+    void Buffer::map(VkDeviceSize size, VkDeviceSize offset) {
+        if (vkMapMemory(device, memory, offset, size, 0, &mapped) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to map Skip::buffer");
+        }
+    }
+    void Buffer::unmap() {
+        if (mapped) {
+            vkUnmapMemory(device, memory);
+            mapped = nullptr;
+        }
+    };
+
+    VkResult Buffer::bind(VkDeviceSize offset) {
+        return vkBindBufferMemory(device, buffer, memory, offset);
+    }
+
+    void Buffer::setupDescriptor(VkDeviceSize size, VkDeviceSize offset) {
+        descriptor.offset = offset;
+        descriptor.buffer = buffer;
+        descriptor.range = size;
+    }
+    void Buffer::copyTo(void* data, VkDeviceSize size) {
+        assert(mapped);
+        memcpy(mapped, data, size);
+    }
+
+    VkResult Buffer::flush(VkDeviceSize size, VkDeviceSize offset) {
+        VkMappedMemoryRange mappedRange = {};
+        mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+        mappedRange.memory = memory;
+        mappedRange.offset = offset;
+        mappedRange.size = size;
+        return vkFlushMappedMemoryRanges(device, 1, &mappedRange);
+    }
+    
+    VkResult Buffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
+        VkMappedMemoryRange mappedRange = {};
+        mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+        mappedRange.memory = memory;
+        mappedRange.offset = offset;
+        mappedRange.size = size;
+        return vkInvalidateMappedMemoryRanges(device, 1, &mappedRange);
+    }
+
+    void Buffer::destroy() {
+        if (buffer) {
+            vkDestroyBuffer(device, buffer, nullptr);
+        }
+        if (memory) {
+            vkFreeMemory(device, memory, nullptr);
+        }
+    }
+
     // IMGUI Class
     bool show_demo_window = true;
     ImguiContext::ImguiContext() {
@@ -14,14 +69,8 @@ namespace Skip {
     void ImguiContext::DestroyImguiContext(VkDevice device) {
         ImGui::DestroyContext();
 
-        if (vertexBufferMemory != VK_NULL_HANDLE) {
-            vkFreeMemory(device, vertexBufferMemory, nullptr);
-            vkDestroyBuffer(device, vertexBuffer, nullptr);
-        }
-        if (indexBufferMemory != VK_NULL_HANDLE) {
-            vkFreeMemory(device, indexBufferMemory, nullptr);
-            vkDestroyBuffer(device, indexBuffer, nullptr);
-        }
+        vertexBuffer.destroy();
+        indexBuffer.destroy();
 
         vkDestroyImage(device, fontImage, nullptr);
         vkDestroyImageView(device, fontView, nullptr);
@@ -48,7 +97,8 @@ namespace Skip {
         io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
     }
 
-    void ImguiContext::initResources(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, VkQueue copyQueue, VkCommandPool commandPool, const std::string& shadersPath, VkSampleCountFlagBits msaaSamples) {
+    void ImguiContext::initResources(VkDevice device, VkPhysicalDevice physicalDevice, VkRenderPass renderPass, 
+        VkQueue copyQueue, VkCommandPool commandPool, const std::string& shadersPath, VkSampleCountFlagBits msaaSamples) {
         ImGuiIO& io = ImGui::GetIO();
 
         // Create font texture
@@ -117,35 +167,14 @@ namespace Skip {
         // Copy buffer data to font image
         VkCommandBuffer copyCmd = beginSingleTimeCommands(device, commandPool);
         // Prepare for transfer
-        VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        VkImageLayout oldImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        VkImageLayout newImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_HOST_BIT;
-        VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
-        VkImageSubresourceRange subresourceRange = {};
-        subresourceRange.aspectMask = aspectMask;
-        subresourceRange.baseMipLevel = 0;
-        subresourceRange.levelCount = 1;
-        subresourceRange.layerCount = 1;
-
-        VkImageMemoryBarrier imageMemoryBarrier{};
-        imageMemoryBarrier.oldLayout = oldImageLayout;
-        imageMemoryBarrier.newLayout = newImageLayout;
-        imageMemoryBarrier.image = fontImage;
-        imageMemoryBarrier.subresourceRange = subresourceRange;
-        imageMemoryBarrier.srcAccessMask = 0;
-        imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        // Put barrier inside setup command buffer
-        vkCmdPipelineBarrier(
+        setImageLayout(
             copyCmd,
-            srcStageMask,
-            dstStageMask,
-            0,
-            0, nullptr,
-            0, nullptr,
-            1, &imageMemoryBarrier);
+            fontImage,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_PIPELINE_STAGE_HOST_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT);
 
 
         // Copy
@@ -166,34 +195,15 @@ namespace Skip {
         );
 
         // Prepare for shader read
-        aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        oldImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        newImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        srcStageMask = VK_PIPELINE_STAGE_HOST_BIT;
-        dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
-        subresourceRange = {};
-        subresourceRange.aspectMask = aspectMask;
-        subresourceRange.baseMipLevel = 0;
-        subresourceRange.levelCount = 1;
-        subresourceRange.layerCount = 1;
-
-        imageMemoryBarrier = {};
-        imageMemoryBarrier.oldLayout = oldImageLayout;
-        imageMemoryBarrier.newLayout = newImageLayout;
-        imageMemoryBarrier.image = fontImage;
-        imageMemoryBarrier.subresourceRange = subresourceRange;
-        imageMemoryBarrier.srcAccessMask = 0;
-        imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        vkCmdPipelineBarrier(
+        setImageLayout(
             copyCmd,
-            srcStageMask,
-            dstStageMask,
-            0,
-            0, nullptr,
-            0, nullptr,
-            1, &imageMemoryBarrier);
+            fontImage,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
         endSingleTimeCommands(device, copyQueue, commandPool, copyCmd);
 
         vkDestroyBuffer(device, stagingBuffer, nullptr);
@@ -538,137 +548,27 @@ namespace Skip {
         // Update buffers only if vertex or index count has been changed compared to current buffer size
 
         // Vertex buffer
-        if ((vertexBuffer == VK_NULL_HANDLE) || (vertexCount != imDrawData->TotalVtxCount)) {
-            //vertexBuffer.unmap()
-            if (vertMapped) {
-                vkUnmapMemory(device, vertexBufferMemory);
-                vertMapped = nullptr;
-            }
-
-            //vertexBuffer.destroy();
-            if (vertexBufferMemory) {
-                vkFreeMemory(device, vertexBufferMemory, nullptr);
-                vertexBufferMemory = VK_NULL_HANDLE;
-            }
-            if (vertexBuffer) {
-                //vkDestroyBuffer(device, vertexBuffer, nullptr);
-            }
-
-            // Create the buffer handle
-            VkBufferCreateInfo vertBufferCreateInfo{};
-            vertBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            vertBufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-            vertBufferCreateInfo.size = vertexBufferSize;
-
-            if (vkCreateBuffer(device, &vertBufferCreateInfo, nullptr, &vertexBuffer) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to create vertex buffer!");
-            }
-
-            // Create the memory backing up the buffer handle
-            VkMemoryRequirements memReqs;
-            VkMemoryAllocateInfo memAlloc{};
-            memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-
-            vkGetBufferMemoryRequirements(device, vertexBuffer, &memReqs);
-            memAlloc.allocationSize = memReqs.size;
-            memAlloc.memoryTypeIndex = findMemoryType(physicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-            if (vkAllocateMemory(device, &memAlloc, nullptr, &vertexBufferMemory) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to allocate image memory");
-            }
-
-            // If a pointer to the buffer data has been passed, map the buffer and copy over the data
-            void* data;
-            if (vertMapped != nullptr) {
-                vkMapMemory(device, vertexBufferMemory, 0, vertexBufferSize, 0, &vertMapped);
-                memcpy(vertMapped, data, vertexBufferSize);
-                if ((VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
-                    VkMappedMemoryRange mappedRange = {};
-                    mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-                    mappedRange.memory = vertexBufferMemory;
-                    mappedRange.offset = 0;
-                    mappedRange.size = vertexBufferSize;
-                    vkFlushMappedMemoryRanges(device, 1, &mappedRange);
-                }
-
-                if (vertMapped) {
-                    vkUnmapMemory(device, vertexBufferMemory);
-                    vertMapped = nullptr;
-                }
-            }
-            vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+        if ((vertexBuffer.buffer == VK_NULL_HANDLE) || (vertexCount != imDrawData->TotalVtxCount)) {
+            vertexBuffer.unmap();
+            vertexBuffer.destroy();
+            createBuffer(device, physicalDevice, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                &vertexBuffer, vertexBufferSize);
             vertexCount = imDrawData->TotalVtxCount;
-            //vertexBuffer.map();
-            vkMapMemory(device, vertexBufferMemory, 0, vertexBufferSize, 0, &vertMapped);
+            vertexBuffer.map();
         }
 
-        // Index buffer
-        if ((indexBuffer == VK_NULL_HANDLE) || (indexCount < imDrawData->TotalIdxCount)) {
-            //indexBuffer.unmap()
-            if (indexMapped) {
-                vkUnmapMemory(device, indexBufferMemory);
-                indexMapped = nullptr;
-            }
-
-            //indexBuffer.destroy();
-            if (indexBufferMemory) {
-                vkFreeMemory(device, indexBufferMemory, nullptr);
-                indexBufferMemory = VK_NULL_HANDLE;
-            }
-            if (indexBuffer) {
-                //vkDestroyBuffer(device, indexBuffer, nullptr);
-            }
-            
-            // Create the buffer handle
-            VkBufferCreateInfo indexBufferCreateInfo{};
-            indexBufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            indexBufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-            indexBufferCreateInfo.size = indexBufferSize;
-
-            if (vkCreateBuffer(device, &indexBufferCreateInfo, nullptr, &indexBuffer) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to create index buffer!");
-            }
-
-            // Create the memory backing up the buffer handle
-            VkMemoryRequirements memReqs;
-            VkMemoryAllocateInfo memAlloc{};
-            memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-
-            vkGetBufferMemoryRequirements(device, indexBuffer, &memReqs);
-            memAlloc.allocationSize = memReqs.size;
-            memAlloc.memoryTypeIndex = findMemoryType(physicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-            if (vkAllocateMemory(device, &memAlloc, nullptr, &indexBufferMemory) != VK_SUCCESS) {
-                throw std::runtime_error("Failed to allocate image memory");
-            }
-
-            // If a pointer to the buffer data has been passed, map the buffer and copy over the data
-            void* data;
-            if (indexMapped != nullptr) {
-                vkMapMemory(device, indexBufferMemory, 0, indexBufferSize, 0, &indexMapped);
-                memcpy(indexMapped, data, indexBufferSize);
-                if ((VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
-                    VkMappedMemoryRange mappedRange = {};
-                    mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-                    mappedRange.memory = indexBufferMemory;
-                    mappedRange.offset = 0;
-                    mappedRange.size = indexBufferSize;
-                    vkFlushMappedMemoryRanges(device, 1, &mappedRange);
-                }
-
-                if (indexMapped) {
-                    vkUnmapMemory(device, indexBufferMemory);
-                    indexMapped = nullptr;
-                }
-            }
-            vkBindBufferMemory(device, indexBuffer, indexBufferMemory, 0);
+        if ((indexBuffer.buffer == VK_NULL_HANDLE) || (indexCount < imDrawData->TotalIdxCount)) {
+            indexBuffer.unmap();
+            indexBuffer.destroy();
+            createBuffer(device, physicalDevice, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+                &indexBuffer, indexBufferSize);
             indexCount = imDrawData->TotalIdxCount;
-            //indexBuffer.map();
-            vkMapMemory(device, indexBufferMemory, 0, indexBufferSize, 0, &indexMapped);
+            indexBuffer.map();
         }
-
 
         // Upload data
-        ImDrawVert* vtxDst = (ImDrawVert*)vertMapped;
-        ImDrawIdx* idxDst = (ImDrawIdx*)indexMapped;
+        ImDrawVert* vtxDst = (ImDrawVert*)vertexBuffer.mapped;
+        ImDrawIdx* idxDst = (ImDrawIdx*)indexBuffer.mapped;
 
         for (int n = 0; n < imDrawData->CmdListsCount; n++) {
             const ImDrawList* cmd_list = imDrawData->CmdLists[n];
@@ -679,21 +579,8 @@ namespace Skip {
         }
 
         // Flush to make writes visible to GPU
-        //vertexBuffer.flush();
-        VkMappedMemoryRange mappedRangeVert = {};
-        mappedRangeVert.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRangeVert.memory = vertexBufferMemory;
-        mappedRangeVert.offset = 0;
-        mappedRangeVert.size = VK_WHOLE_SIZE;
-        vkFlushMappedMemoryRanges(device, 1, &mappedRangeVert);
-
-        //indexBuffer.flush();
-        VkMappedMemoryRange mappedRangeIndex = {};
-        mappedRangeIndex.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-        mappedRangeIndex.memory = indexBufferMemory;
-        mappedRangeIndex.offset = 0;
-        mappedRangeIndex.size = VK_WHOLE_SIZE;
-        vkFlushMappedMemoryRanges(device, 1, &mappedRangeIndex);
+        vertexBuffer.flush();
+        indexBuffer.flush();
     }
 
     void ImguiContext::drawFrame(VkCommandBuffer commandBuffer) {
@@ -702,7 +589,6 @@ namespace Skip {
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-        //VkViewport viewport = vks::initializers::viewport(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y, 0.0f, 1.0f);
         VkViewport viewport{};
         viewport.width = io.DisplaySize.x;
         viewport.height = io.DisplaySize.y;
@@ -723,8 +609,8 @@ namespace Skip {
         if (imDrawData->CmdListsCount > 0) {
 
             VkDeviceSize offsets[1] = { 0 };
-            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
-            vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer.buffer, offsets);
+            vkCmdBindIndexBuffer(commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT16);
 
             for (int32_t i = 0; i < imDrawData->CmdListsCount; i++)
             {
@@ -761,7 +647,7 @@ namespace Skip {
     }
 
     uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
-        //query for properties
+        //query for properties using physical device
         // memProperties has two arrays -- memoryTypes and memoryHeaps
         // Heaps are distinct memory resources like VRAM and swap space in RAM when VRAM runs out
         // Different types of memory exists within these heaps.
@@ -780,37 +666,7 @@ namespace Skip {
         throw std::runtime_error("Failed to find suitible memory type!");
     }
 
-    void createBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-        VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
-        VkBufferCreateInfo bufferInfo{};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = size; //size of buffer in bytes
-        bufferInfo.usage = usage; //purposes the data in the buffer
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // buffer only used in graphics queue and not elsewhere
-        bufferInfo.flags = 0;
-
-        if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create buffer!");
-        }
-
-        // Buffer is created, but we need to assign memory to it
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
-
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties);
-
-        // Real world you do not have to manually allocate individual buffer memory
-        // TODO: look into using VulkanMemoryAllocator library
-        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate buffer memory!");
-        }
-        // fourth param is the offset within the region of memory
-        // if non-zero, then it is required to be divisible by memRequirements.alignment
-        vkBindBufferMemory(device, buffer, bufferMemory, 0);
-    }
+    
 
     VkCommandBuffer beginSingleTimeCommands(VkDevice device, VkCommandPool commandPool) {
         //helper function
@@ -860,5 +716,293 @@ namespace Skip {
             throw std::runtime_error("Failed to create shader module!");
         }
         return shaderModule;
+    }
+
+    bool hasStencilComponent(VkFormat format) {
+        return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+    }
+
+    void transitionImageLayout(VkDevice device, VkPhysicalDevice physicalDevice, VkCommandPool commandPool, VkQueue queue,
+        VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) {
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, commandPool);
+
+        VkPipelineStageFlags sourceStage, destinationStage;
+
+        VkImageMemoryBarrier barrier{};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = oldLayout;
+        barrier.newLayout = newLayout;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+        barrier.image = image;
+
+        if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+            if (hasStencilComponent(format)) {
+                barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+            }
+        }
+        else {
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        }
+
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = mipLevels;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+
+        if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+            newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        }
+        else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+            newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        }
+        else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+            newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        }
+        else {
+            throw std::invalid_argument("Unsupported layout transition!");
+        }
+
+        vkCmdPipelineBarrier(
+            commandBuffer,
+            sourceStage, destinationStage,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &barrier
+        );
+
+        endSingleTimeCommands(device, queue, commandPool, commandBuffer);
+    }
+
+    void setImageLayout(VkCommandBuffer cmdbuffer, VkImage image, VkImageAspectFlags aspectMask,
+        VkImageLayout oldImageLayout, VkImageLayout newImageLayout, VkPipelineStageFlags srcStageMask,
+        VkPipelineStageFlags dstStageMask) {
+        VkImageSubresourceRange subresourceRange = {};
+        subresourceRange.aspectMask = aspectMask;
+        subresourceRange.baseMipLevel = 0;
+        subresourceRange.levelCount = 1;
+        subresourceRange.layerCount = 1;
+        setImageLayout(cmdbuffer, image, oldImageLayout, newImageLayout, subresourceRange, srcStageMask, dstStageMask);
+    }
+
+    void setImageLayout(VkCommandBuffer cmdbuffer, VkImage image, VkImageLayout oldImageLayout,
+        VkImageLayout newImageLayout, VkImageSubresourceRange subresourceRange, VkPipelineStageFlags srcStageMask,
+        VkPipelineStageFlags dstStageMask) {
+        // Create an image barrier object
+        VkImageMemoryBarrier imageMemoryBarrier{};
+        imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageMemoryBarrier.oldLayout = oldImageLayout;
+        imageMemoryBarrier.newLayout = newImageLayout;
+        imageMemoryBarrier.image = image;
+        imageMemoryBarrier.subresourceRange = subresourceRange;
+
+        // Source layouts (old)
+        // Source access mask controls actions that have to be finished on the old layout
+        // before it will be transitioned to the new layout
+        switch (oldImageLayout)
+        {
+        case VK_IMAGE_LAYOUT_UNDEFINED:
+            // Image layout is undefined (or does not matter)
+            // Only valid as initial layout
+            // No flags required, listed only for completeness
+            imageMemoryBarrier.srcAccessMask = 0;
+            break;
+
+        case VK_IMAGE_LAYOUT_PREINITIALIZED:
+            // Image is preinitialized
+            // Only valid as initial layout for linear images, preserves memory contents
+            // Make sure host writes have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+            // Image is a color attachment
+            // Make sure any writes to the color buffer have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+            // Image is a depth/stencil attachment
+            // Make sure any writes to the depth/stencil buffer have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+            // Image is a transfer source
+            // Make sure any reads from the image have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+            // Image is a transfer destination
+            // Make sure any writes to the image have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+            // Image is read by a shader
+            // Make sure any shader reads from the image have been finished
+            imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            break;
+        default:
+            // Other source layouts aren't handled (yet)
+            break;
+        }
+
+        // Target layouts (new)
+        // Destination access mask controls the dependency for the new image layout
+        switch (newImageLayout)
+        {
+        case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+            // Image will be used as a transfer destination
+            // Make sure any writes to the image have been finished
+            imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+            // Image will be used as a transfer source
+            // Make sure any reads from the image have been finished
+            imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+            // Image will be used as a color attachment
+            // Make sure any writes to the color buffer have been finished
+            imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+            // Image layout will be used as a depth/stencil attachment
+            // Make sure any writes to depth/stencil buffer have been finished
+            imageMemoryBarrier.dstAccessMask = imageMemoryBarrier.dstAccessMask | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+            break;
+
+        case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+            // Image will be read in a shader (sampler, input attachment)
+            // Make sure any writes to the image have been finished
+            if (imageMemoryBarrier.srcAccessMask == 0)
+            {
+                imageMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+            }
+            imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            break;
+        default:
+            break;
+        }
+
+        vkCmdPipelineBarrier(
+            cmdbuffer,
+            srcStageMask,
+            dstStageMask,
+            0,
+            0, nullptr,
+            0, nullptr,
+            1, &imageMemoryBarrier);
+    }
+
+    void createBuffer(VkPhysicalDevice physicalDevice, VkDevice device, VkDeviceSize size, 
+        VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = size; //size of buffer in bytes
+        bufferInfo.usage = usage; //purposes the data in the buffer
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // buffer only used in graphics queue and not elsewhere
+        bufferInfo.flags = 0;
+
+        if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create buffer!");
+        }
+
+        VkMemoryRequirements memRequirements;
+        vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(physicalDevice, memRequirements.memoryTypeBits, properties);
+        if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate buffer memory!");
+        }
+        vkBindBufferMemory(device, buffer, bufferMemory, 0);
+    }
+
+    // Creates a buffer based on Buffer struct
+    VkResult createBuffer(VkDevice device, VkPhysicalDevice physicalDevice, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags memoryPropertyFlags, 
+        Skip::Buffer* buffer, VkDeviceSize size, void* data) {
+        buffer->device = device;
+
+        // Create the buffer handle
+        VkBufferCreateInfo bufferCreateInfo{};
+        bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferCreateInfo.usage = usageFlags;
+        bufferCreateInfo.size = size;
+        if (vkCreateBuffer(device, &bufferCreateInfo, nullptr, &buffer->buffer) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create buffer from Skip::Buffer");
+        };
+
+        // Create the memory backing up the buffer handle
+        VkMemoryRequirements memReqs;
+        VkMemoryAllocateInfo memAlloc{};
+        memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+
+        vkGetBufferMemoryRequirements(device, buffer->buffer, &memReqs);
+        memAlloc.allocationSize = memReqs.size;
+        // Find a memory type index that fits the properties of the buffer
+        memAlloc.memoryTypeIndex = findMemoryType(physicalDevice, memReqs.memoryTypeBits, memoryPropertyFlags);
+        // If the buffer has VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT set we also need to enable the appropriate flag during allocation
+        VkMemoryAllocateFlagsInfoKHR allocFlagsInfo{};
+        if (usageFlags & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+            allocFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO_KHR;
+            allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+            memAlloc.pNext = &allocFlagsInfo;
+        }
+        if (vkAllocateMemory(device, &memAlloc, nullptr, &buffer->memory) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to allocate buffer memory");
+        };
+
+        buffer->alignment = memReqs.alignment;
+        buffer->size = size;
+        buffer->usageFlags = usageFlags;
+        buffer->memoryPropertyFlags = memoryPropertyFlags;
+
+        // If a pointer to the buffer data has been passed, map the buffer and copy over the data
+        if (data != nullptr)
+        {
+            buffer->map();
+            memcpy(buffer->mapped, data, size);
+            if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
+                buffer->flush();
+            }
+
+            buffer->unmap();
+        }
+
+        // Initialize a default descriptor that covers the whole buffer size
+        buffer->setupDescriptor();
+
+        // Attach the memory to the buffer object
+        return buffer->bind();
     }
 }

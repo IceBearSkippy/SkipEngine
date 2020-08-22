@@ -114,11 +114,11 @@ namespace Skip {
         void createColorResources();
         void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format,
             VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-        bool hasStencilComponent(VkFormat format);
+        //bool hasStencilComponent(VkFormat format);
 
         void createDepthResources();
-        void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
-            VkImageLayout newLayout, uint32_t mipLevels);
+        //void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
+        //    VkImageLayout newLayout, uint32_t mipLevels);
 
         void createFramebuffers();
 
