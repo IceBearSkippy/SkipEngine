@@ -151,17 +151,14 @@ namespace Skip {
 
         // Staging buffers for font data upload
 
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        createBuffer(physicalDevice, device, uploadSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
-            stagingBufferMemory);
+        Buffer stagingBuffer;
 
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, uploadSize, 0, &data);
-        memcpy(data, fontData, (size_t)uploadSize);
-        vkUnmapMemory(device, stagingBufferMemory);
+        createBuffer(device, physicalDevice, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &stagingBuffer, uploadSize);
+
+        stagingBuffer.map();
+        memcpy(stagingBuffer.mapped, fontData, uploadSize);
+        stagingBuffer.unmap();
 
 
         // Copy buffer data to font image
@@ -187,7 +184,7 @@ namespace Skip {
 
         vkCmdCopyBufferToImage(
             copyCmd,
-            stagingBuffer,
+            stagingBuffer.buffer,
             fontImage,
             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             1,
@@ -205,10 +202,7 @@ namespace Skip {
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
         endSingleTimeCommands(device, copyQueue, commandPool, copyCmd);
-
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
-        //stagingBuffer.destroy();
+        stagingBuffer.destroy();
 
         // Font texture Sampler
         VkSamplerCreateInfo samplerInfo{};
@@ -988,14 +982,12 @@ namespace Skip {
         buffer->memoryPropertyFlags = memoryPropertyFlags;
 
         // If a pointer to the buffer data has been passed, map the buffer and copy over the data
-        if (data != nullptr)
-        {
+        if (data != nullptr) {
             buffer->map();
             memcpy(buffer->mapped, data, size);
             if ((memoryPropertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
                 buffer->flush();
             }
-
             buffer->unmap();
         }
 

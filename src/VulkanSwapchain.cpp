@@ -105,16 +105,16 @@ namespace Skip {
     }
 
     void VulkanSwapchain::drawFrame(uint32_t currentImage, float deltaTime) {
+        //TODO debug this draw frame for each frame
+
         this->buildCommandBuffers();
+
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
 
         _frameTimer = (float)deltaTime / 1000.0f;
         //Submitting the command buffer
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        //specify which semaphores to wait on and in which stage
-        // we want to wait with writing colors to the image until it's available,
-        // so we specify the stage of graphics pipeline that writes to color attachment
         VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[_currentFrame] };
         VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
         submitInfo.waitSemaphoreCount = 1;
@@ -157,7 +157,7 @@ namespace Skip {
         presentInfo.pResults = nullptr; //optional
 
         VkResult result = vkQueuePresentKHR(_vkDevice->_queues.present, &presentInfo);
-
+        vkQueueWaitIdle(_vkDevice->_queues.present);
         // gives condition if presentation queue is optimal/suboptimal
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             _framebufferResized = false;
@@ -218,9 +218,6 @@ namespace Skip {
         this->createDescriptorPool();
         this->createDescriptorSets();
         this->allocateCommandBuffers();
-        
-        this->buildCommandBuffers();
-
 
     }
 
@@ -1378,8 +1375,6 @@ namespace Skip {
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = 0; // optional
-        beginInfo.pInheritanceInfo = nullptr; // optional
 
         _imguiContext->newFrame("test", "GPU_NAME", _frameTimer, true, _scene->_camera);
         
