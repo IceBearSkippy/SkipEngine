@@ -91,7 +91,7 @@ int main()
 
         swapchain->updateUniformBuffers(currentImage);
 
-        vulkanManager->drawFrame(currentImage);
+        vulkanManager->drawFrame(currentImage, deltaTime);
     }
     vulkanManager->~VulkanManager();
     return 0;
