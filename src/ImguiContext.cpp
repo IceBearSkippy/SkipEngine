@@ -457,6 +457,9 @@ namespace Skip {
             &pipelineCreateInfo, nullptr, &pipeline) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create imgui graphics pipeline!");
         }
+
+        vkDestroyShaderModule(device, vertShaderModule, nullptr);
+        vkDestroyShaderModule(device, fragShaderModule, nullptr);
     }
     
     // Starts a new imGui frame and sets up windows and ui elements
