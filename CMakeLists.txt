@@ -15,6 +15,7 @@ set( CMAKE_CXX_EXTENSIONS OFF )
 set ( SOURCE_FOLDER ./src )
 set ( INCLUDE_FOLDER ./include )
 set ( LIBS_FOLDER ./libs )
+set ( RESOURCES_FOLDER ./resources )
 
 if(DEFINED ENV{VULKAN_SDK})
     message( STATUS "Found sourced env variable VULKAN_SDK ")
@@ -31,6 +32,7 @@ find_package( Vulkan REQUIRED )
 find_package( glfw3 REQUIRED )
 find_package( glm REQUIRED )
 find_package( tinyobjloader REQUIRED )
+find_package( imgui REQUIRED )
 
 list ( APPEND PROJECT_INCLUDE_DIRECTORIES
   ${SOURCE_FOLDER}
@@ -39,9 +41,14 @@ list ( APPEND PROJECT_INCLUDE_DIRECTORIES
   ${INCLUDE_FOLDER}
 )
 
+# copy over resources directory
+file(COPY ${RESOURCES_FOLDER} DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY ${LIBS_FOLDER} DESTINATION ${CMAKE_BINARY_DIR})
+
 list ( APPEND PROJECT_EXECUTABLE_FILES
   ${SOURCE_FOLDER}/VulkanWindow.cpp
   ${SOURCE_FOLDER}/VulkanDevice.cpp
+  ${SOURCE_FOLDER}/ImguiContext.cpp
   ${SOURCE_FOLDER}/VulkanSwapchain.cpp
   ${SOURCE_FOLDER}/objects/SkipObject.cpp
   ${SOURCE_FOLDER}/objects/Model.cpp
@@ -56,9 +63,6 @@ list ( APPEND PROJECT_EXECUTABLE_FILES
 
 # include files
 include_directories( ${PROJECT_INCLUDE_DIRECTORIES} )
-
-# copy over resources directory
-file(COPY ./resources DESTINATION ${CMAKE_BINARY_DIR})
 
 # target
 add_executable( ${APP_NAME} ${PROJECT_EXECUTABLE_FILES} )
@@ -76,3 +80,4 @@ endif()
 target_link_libraries( ${APP_NAME} tinyobjloader::tinyobjloader )
 target_link_libraries( ${APP_NAME} glfw )
 target_link_libraries( ${APP_NAME} glm )
+target_link_libraries( ${APP_NAME} imgui::imgui )

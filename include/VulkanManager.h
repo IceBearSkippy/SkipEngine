@@ -9,6 +9,9 @@
 #include <set>
 #include <cstring>
 
+
+
+
 #include <VulkanSwapchain.h>
 
 const std::string ENGINE_NAME = "SkipEngine";
@@ -41,7 +44,7 @@ namespace Skip {
 
         bool checkValidationLayerSupport();
 
-        void drawFrame(uint32_t currentImage);
+        void drawFrame(uint32_t currentImage, float deltaTime);
 
         VulkanWindow* _window;
         bool _enableValidationLayers;
@@ -73,8 +76,5 @@ namespace Skip {
         VkSampleCountFlagBits getMaxUsableSampleCount(VkPhysicalDevice device);
         GPUInfo createGPUInfo(VkPhysicalDevice device);
         GPUInfo* pickPhysicalDevice();
-
     };
-
-
 }

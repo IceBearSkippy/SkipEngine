@@ -5,21 +5,29 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
+
 namespace Skip {
 
     VulkanSwapchain::VulkanSwapchain() {};
 
-    VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, SkipScene* scene) {
+    VulkanSwapchain::VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, VkInstance* instance, SkipScene* scene) {
         _vkDevice = vkDevice;
         _vkWindow = vkWindow;
+        _instance = instance;
         _scene = scene;
         _currentFrame = 0;
+
         this->createSwapChain();
         this->createImageViews();
         this->createRenderPass();
+        this->createPipelineCache();
         this->createDescriptorSetLayout();
-        this->createGraphicsPipeline();
         this->createCommandPool();
+
+        this->createGraphicsPipeline();
+
+        this->initImgui();
+
         this->createColorResources();
         this->createDepthResources();
         this->createFramebuffers();
@@ -32,17 +40,21 @@ namespace Skip {
         this->createUniformBuffers();
         this->createDescriptorPool();
         this->createDescriptorSets();
-        this->createCommandBuffers();
         this->createSyncObjects();
+
+        this->allocateCommandBuffers();
+        this->buildCommandBuffers();
+        
     };
 
     VulkanSwapchain::~VulkanSwapchain() {
 
         vkDeviceWaitIdle(*_vkDevice->getLogicalDevice());
-
         this->cleanupSwapChain();
-
+        
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        _imguiContext->DestroyImguiContext(logicalDevice);
+        
         for (size_t i = 0; i < _scene->_objects.size(); i++) {
             vkDestroySampler(logicalDevice, _scene->_objects[i]->_textureSampler, nullptr);
             vkDestroyImageView(logicalDevice, _scene->_objects[i]->_textureImageView, nullptr);
@@ -65,7 +77,7 @@ namespace Skip {
             vkDestroySemaphore(logicalDevice, _imageAvailableSemaphores[i], nullptr);
             vkDestroyFence(logicalDevice, _inFlightFences[i], nullptr);
         }
-
+        vkDestroyPipelineCache(logicalDevice, _pipelineCache, nullptr);
         vkDestroyCommandPool(logicalDevice, _commandPool, nullptr);
         vkDestroyDevice(logicalDevice, nullptr);
     };
@@ -92,15 +104,17 @@ namespace Skip {
         return imageIndex;
     }
 
-    void VulkanSwapchain::drawFrame(uint32_t currentImage) {
+    void VulkanSwapchain::drawFrame(uint32_t currentImage, float deltaTime) {
+        //TODO debug this draw frame for each frame
+
+        this->buildCommandBuffers();
+
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
 
+        _frameTimer = (float)deltaTime / 1000.0f;
         //Submitting the command buffer
         VkSubmitInfo submitInfo{};
         submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        //specify which semaphores to wait on and in which stage
-        // we want to wait with writing colors to the image until it's available,
-        // so we specify the stage of graphics pipeline that writes to color attachment
         VkSemaphore waitSemaphores[] = { _imageAvailableSemaphores[_currentFrame] };
         VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
         submitInfo.waitSemaphoreCount = 1;
@@ -143,7 +157,7 @@ namespace Skip {
         presentInfo.pResults = nullptr; //optional
 
         VkResult result = vkQueuePresentKHR(_vkDevice->_queues.present, &presentInfo);
-
+        vkQueueWaitIdle(_vkDevice->_queues.present);
         // gives condition if presentation queue is optimal/suboptimal
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             _framebufferResized = false;
@@ -153,6 +167,7 @@ namespace Skip {
         }
 
         _currentFrame = (_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+
     }
 
     void VulkanSwapchain::updateUniformBuffers(uint32_t currentImage) {
@@ -171,6 +186,13 @@ namespace Skip {
         }
     }
 
+    void VulkanSwapchain::createPipelineCache() {
+        VkPipelineCacheCreateInfo pipelineCacheCreateInfo = {};
+        pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+        if (vkCreatePipelineCache(*_vkDevice->getLogicalDevice(), &pipelineCacheCreateInfo, nullptr, &_pipelineCache) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create pipeline cache!");
+        }
+    }
 
     // recreateSwapChain is called when we draw frames
     void VulkanSwapchain::recreateSwapChain() {
@@ -195,7 +217,7 @@ namespace Skip {
         this->createUniformBuffers();
         this->createDescriptorPool();
         this->createDescriptorSets();
-        this->createCommandBuffers();
+        this->allocateCommandBuffers();
 
     }
 
@@ -563,20 +585,16 @@ namespace Skip {
         }
     }
 
-
     void VulkanSwapchain::createGraphicsPipeline() {
-        //TODO: refactor to compile inline for .vert and .frag as initial setup?
-        //      Could also pass in file paths to read into this functions
-        //
         // Builds the following member variables:
         //     _pipelineLayout
         //     _graphicsPipeline
-
+        VkDevice device = *_vkDevice->getLogicalDevice();
         auto vertShaderCode = readFile("resources/shaders/vert.spv");
         auto fragShaderCode = readFile("resources/shaders/frag.spv");
 
-        VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-        VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+        VkShaderModule vertShaderModule = createShaderModule(device, vertShaderCode);
+        VkShaderModule fragShaderModule = createShaderModule(device, fragShaderCode);
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
         VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
@@ -597,8 +615,10 @@ namespace Skip {
         fragShaderStageInfo.pName = "main";
         fragShaderStageInfo.pSpecializationInfo = nullptr;
 
-        VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
-
+        std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages { 
+            vertShaderStageInfo,
+            fragShaderStageInfo
+        };
         // create vertex input
         auto bindingDescription = Vertex::getBindingDescription();
         auto attributeDescriptions = Vertex::getAttributeDescriptions();
@@ -644,7 +664,6 @@ namespace Skip {
         rasterizer.depthClampEnable = VK_FALSE;
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-
         rasterizer.lineWidth = 1.0f;
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
@@ -696,7 +715,7 @@ namespace Skip {
         // dynamic states -- not included currently
         VkDynamicState dynamicStates[] = {
             VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_LINE_WIDTH
+            VK_DYNAMIC_STATE_SCISSOR
         };
 
         VkPipelineDynamicStateCreateInfo dynamicState{};
@@ -733,8 +752,8 @@ namespace Skip {
         // create Graphics Pipeline
         VkGraphicsPipelineCreateInfo pipelineInfo{};
         pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        pipelineInfo.stageCount = 2; // what is this for?
-        pipelineInfo.pStages = shaderStages;
+        pipelineInfo.stageCount = static_cast<uint32_t>(shaderStages.size()); // what is this for?
+        pipelineInfo.pStages = shaderStages.data();
 
         pipelineInfo.pVertexInputState = &vertexInputInfo;
         pipelineInfo.pInputAssemblyState = &inputAssembly;
@@ -743,7 +762,7 @@ namespace Skip {
         pipelineInfo.pMultisampleState = &multisampling;
         pipelineInfo.pDepthStencilState = &depthStencil; // optional
         pipelineInfo.pColorBlendState = &colorBlending;
-        pipelineInfo.pDynamicState = nullptr; // optional
+        pipelineInfo.pDynamicState = &dynamicState; // optional
 
         pipelineInfo.layout = _pipelineLayout;
         pipelineInfo.renderPass = _renderPass;
@@ -752,25 +771,12 @@ namespace Skip {
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // optional -- can switch between pipelines, but right now there's only one
         pipelineInfo.basePipelineIndex = -1; // optional
 
-        if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1,
-            &pipelineInfo, nullptr, &_graphicsPipeline) != VK_SUCCESS) {
+        if (vkCreateGraphicsPipelines(logicalDevice, _pipelineCache, 1, &pipelineInfo, nullptr, &_graphicsPipeline) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create graphics pipeline!");
         }
 
         vkDestroyShaderModule(logicalDevice, vertShaderModule, nullptr);
         vkDestroyShaderModule(logicalDevice, fragShaderModule, nullptr);
-    }
-
-    VkShaderModule VulkanSwapchain::createShaderModule(const std::vector<char>& code) {
-        VkShaderModuleCreateInfo createInfo{};
-        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        createInfo.codeSize = code.size();
-        createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
-        VkShaderModule shaderModule;
-        if (vkCreateShaderModule(*_vkDevice->getLogicalDevice(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create shader module!");
-        }
-        return shaderModule;
     }
 
     void VulkanSwapchain::createCommandPool() {
@@ -779,50 +785,10 @@ namespace Skip {
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-        // there are two flags:
-        // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT - command buffers are rerecorded with new commands ofter (memory allocation behavior may change)
-        // VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT - command buffers to be rerecorded individually, without this flag, they all have to be reset together
-        poolInfo.flags = 0; // optional - we're currently not using either
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
         if (vkCreateCommandPool(*_vkDevice->getLogicalDevice(), &poolInfo, nullptr, &_commandPool) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create command pool!");
         }
-    }
-
-    VkCommandBuffer VulkanSwapchain::beginSingleTimeCommands() {
-        //helper function
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandPool = _commandPool;
-        allocInfo.commandBufferCount = 1;
-
-        VkCommandBuffer commandBuffer;
-        vkAllocateCommandBuffers(*_vkDevice->getLogicalDevice(), &allocInfo, &commandBuffer);
-
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // only using it once and wait returning
-        vkBeginCommandBuffer(commandBuffer, &beginInfo);
-        return commandBuffer;
-    }
-
-    void VulkanSwapchain::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
-        //helper function
-        // stop recording
-        vkEndCommandBuffer(commandBuffer);
-
-        // time to execute transfer
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
-
-        vkQueueSubmit(_vkDevice->_queues.graphics, 1, &submitInfo, VK_NULL_HANDLE);
-
-        // We either could use a fence and wait with vkWaitForFences
-        // or vkQueueWaitIdle (one at a time)
-        vkQueueWaitIdle(_vkDevice->_queues.graphics);
-        vkFreeCommandBuffers(*_vkDevice->getLogicalDevice(), _commandPool, 1, &commandBuffer);
     }
 
     void VulkanSwapchain::createColorResources() {
@@ -865,37 +831,13 @@ namespace Skip {
         VkMemoryAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+        allocInfo.memoryTypeIndex = findMemoryType(_vkDevice->getPhysicalDevice(), memRequirements.memoryTypeBits, properties);
 
         if (vkAllocateMemory(logicalDevice, &allocInfo, nullptr, &imageMemory) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate image memory");
         }
 
         vkBindImageMemory(logicalDevice, image, imageMemory, 0);
-    }
-
-    uint32_t VulkanSwapchain::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
-        //query for properties
-        // memProperties has two arrays -- memoryTypes and memoryHeaps
-        // Heaps are distinct memory resources like VRAM and swap space in RAM when VRAM runs out
-        // Different types of memory exists within these heaps.
-        // We only concern ourselves with the type of memory and not heap
-
-        VkPhysicalDeviceMemoryProperties memProperties;
-        vkGetPhysicalDeviceMemoryProperties(_vkDevice->getPhysicalDevice(), &memProperties);
-
-        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-            // is the corresponding bit set to 1
-            if ((typeFilter & (1 << i)) &&
-                (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-                return i;
-            }
-        }
-        throw std::runtime_error("Failed to find suitible memory type!");
-    }
-
-    bool VulkanSwapchain::hasStencilComponent(VkFormat format) {
-        return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
     }
 
     void VulkanSwapchain::createDepthResources() {
@@ -906,79 +848,11 @@ namespace Skip {
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _depthImage, _depthImageMemory);
         _depthImageView = createImageView(_depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
 
-        transitionImageLayout(_depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED,
+        VkDevice device = *_vkDevice->getLogicalDevice();
+        VkPhysicalDevice physicalDevice = _vkDevice->getPhysicalDevice();
+
+        transitionImageLayout(device, physicalDevice, _commandPool, _vkDevice->_queues.graphics, _depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 1);
-    }
-
-    void VulkanSwapchain::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
-        VkImageLayout newLayout, uint32_t mipLevels) {
-        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-
-        VkPipelineStageFlags sourceStage, destinationStage;
-
-        // Layout transitions -- using an image barrier
-        VkImageMemoryBarrier barrier{};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = oldLayout;
-        barrier.newLayout = newLayout;
-        // we're not transferring queue ownership
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-
-        barrier.image = image;
-
-        if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-
-            if (hasStencilComponent(format)) {
-                barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-            }
-        } else {
-            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        }
-
-
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.levelCount = mipLevels;
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.layerCount = 1;
-
-        if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-            newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-            newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        } else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-            newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        } else {
-            throw std::invalid_argument("Unsupported layout transition!");
-        }
-
-        vkCmdPipelineBarrier(
-            commandBuffer,
-            sourceStage, destinationStage,
-            0,
-            0, nullptr,
-            0, nullptr,
-            1, &barrier
-        );
-
-        endSingleTimeCommands(commandBuffer);
     }
 
 
@@ -1019,6 +893,7 @@ namespace Skip {
         // need a default texturePath
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        VkPhysicalDevice physicalDevice = _vkDevice->getPhysicalDevice();
         for (size_t i = 0; i < _scene->_objects.size(); i++) {
             int texWidth, texHeight, texChannels;
 
@@ -1035,7 +910,7 @@ namespace Skip {
 
             VkBuffer stagingBuffer;
             VkDeviceMemory stagingBufferMemory;
-            createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            createBuffer(physicalDevice, logicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
                 stagingBufferMemory);
@@ -1052,8 +927,9 @@ namespace Skip {
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _scene->_objects[i]->_textureImage, _scene->_objects[i]->_textureImageMemory);
 
             // image layout to transfer (pipeline barrier)
-            transitionImageLayout(_scene->_objects[i]->_textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+            transitionImageLayout(logicalDevice, physicalDevice, _commandPool, _vkDevice->_queues.graphics, _scene->_objects[i]->_textureImage, VK_FORMAT_R8G8B8A8_SRGB,
                 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, _scene->_objects[i]->_mipLevels);
+
             //copy to staging buffer
             copyBufferToImage(stagingBuffer, _scene->_objects[i]->_textureImage,
                 static_cast<uint32_t>(texWidth),
@@ -1069,41 +945,10 @@ namespace Skip {
 
     }
 
-    void VulkanSwapchain::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-        VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
-        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
-        VkBufferCreateInfo bufferInfo{};
-        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        bufferInfo.size = size; //size of buffer in bytes
-        bufferInfo.usage = usage; //purposes the data in the buffer
-        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // buffer only used in graphics queue and not elsewhere
-        bufferInfo.flags = 0;
-
-        if (vkCreateBuffer(logicalDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to create buffer!");
-        }
-
-        // Buffer is created, but we need to assign memory to it
-        VkMemoryRequirements memRequirements;
-        vkGetBufferMemoryRequirements(logicalDevice, buffer, &memRequirements);
-
-        VkMemoryAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-
-        // Real world you do not have to manually allocate individual buffer memory
-        // TODO: look into using VulkanMemoryAllocator library
-        if (vkAllocateMemory(logicalDevice, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-            throw std::runtime_error("Failed to allocate buffer memory!");
-        }
-        // fourth param is the offset within the region of memory
-        // if non-zero, then it is required to be divisible by memRequirements.alignment
-        vkBindBufferMemory(logicalDevice, buffer, bufferMemory, 0);
-    }
-
     void VulkanSwapchain::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        VkDevice device = *_vkDevice->getLogicalDevice();
+        VkPhysicalDevice physicalDevice = _vkDevice->getPhysicalDevice();
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, _commandPool);
 
         VkBufferImageCopy region{};
         region.bufferOffset = 0;
@@ -1131,23 +976,24 @@ namespace Skip {
             &region
         );
 
-        endSingleTimeCommands(commandBuffer);
+        endSingleTimeCommands(device, _vkDevice->_queues.graphics, _commandPool, commandBuffer);
     }
 
     void VulkanSwapchain::generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth,
         int32_t texHeight, uint32_t mipLevels) {
+        VkDevice device = *_vkDevice->getLogicalDevice();
+        VkPhysicalDevice physicalDevice = _vkDevice->getPhysicalDevice();
         // first check if image format supports linear blitting
         // there are alternatives to handle different formats
         // It's uncommon to generate mipmap levels at runtime... They are usually
         // pregenerated and stored in the texture file
         VkFormatProperties formatProperties;
-        vkGetPhysicalDeviceFormatProperties(_vkDevice->getPhysicalDevice(), imageFormat, &formatProperties);
+        vkGetPhysicalDeviceFormatProperties(physicalDevice, imageFormat, &formatProperties);
         if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
             throw std::runtime_error("Texture image format does not support linear blitting!");
         }
 
-
-        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, _commandPool);
 
         VkImageMemoryBarrier barrier{};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1230,7 +1076,7 @@ namespace Skip {
             0, nullptr,
             1, &barrier);
 
-        endSingleTimeCommands(commandBuffer);
+        endSingleTimeCommands(device, _vkDevice->_queues.graphics, _commandPool, commandBuffer);
     }
 
     void VulkanSwapchain::createTextureImageViews() {
@@ -1287,12 +1133,13 @@ namespace Skip {
         // This currently creates buffer and memory buffer in ModelObject
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        VkPhysicalDevice physicalDevice = _vkDevice->getPhysicalDevice();
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         for (size_t i = 0; i < _scene->_objects.size(); i++) {
             VkDeviceSize bufferSize = sizeof(_scene->_objects[i]->_vertices[0]) * _scene->_objects[i]->_vertices.size();
             // TRANSFER_SRC - source of transfer
-            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            createBuffer(physicalDevice, logicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                 stagingBuffer, stagingBufferMemory);
             // filling the vertex buffer by first passing a staging buffer
@@ -1305,7 +1152,7 @@ namespace Skip {
             vkUnmapMemory(logicalDevice, stagingBufferMemory);
 
             // TRANSFER_DST - transfer destination
-            createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            createBuffer(physicalDevice, logicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _scene->_objects[i]->_vertexBuffer, _scene->_objects[i]->_vertexBufferMemory);
 
             copyBuffer(stagingBuffer, _scene->_objects[i]->_vertexBuffer, bufferSize);
@@ -1320,20 +1167,22 @@ namespace Skip {
         // Memory transfer operations use command buffers --> we need a temp command buffer
         // TODO: You might want to create a separate command pool for these short lived copy/transfers.
         //       In that case, use VK_COMMAND_POOL_CREATE_TRANSIENT_BIT flag in command pool
-
-        VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+        VkDevice device = *_vkDevice->getLogicalDevice();
+        VkPhysicalDevice physicalDevice = _vkDevice->getPhysicalDevice();
+        VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, _commandPool);
 
         VkBufferCopy copyRegion{};
         copyRegion.size = size;
         vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 
-        endSingleTimeCommands(commandBuffer);
+        endSingleTimeCommands(device, _vkDevice->_queues.graphics, _commandPool, commandBuffer);
     }
 
     void VulkanSwapchain::createIndexBuffers() {
         // Index buffers are only needed if normals/lightings are not needed as a per vertex
 
         VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        VkPhysicalDevice physicalDevice = _vkDevice->getPhysicalDevice();
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
         for (size_t i = 0; i < _scene->_objects.size(); i++) {
@@ -1341,7 +1190,7 @@ namespace Skip {
             if (_scene->_objects[i]->_useIndexBuffer) {
                 VkDeviceSize bufferSize = sizeof(_scene->_objects[i]->_indices[0]) * _scene->_objects[i]->_indices.size();
                 // TRANSFER_SRC - source of transfer
-                createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                createBuffer(physicalDevice, logicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                     stagingBuffer, stagingBufferMemory);
 
@@ -1355,7 +1204,7 @@ namespace Skip {
                 vkUnmapMemory(logicalDevice, stagingBufferMemory);
 
                 // TRANSFER_DST - transfer destination
-                createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                createBuffer(physicalDevice, logicalDevice, bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, _scene->_objects[i]->_indexBuffer, _scene->_objects[i]->_indexBufferMemory);
 
                 copyBuffer(stagingBuffer, _scene->_objects[i]->_indexBuffer, bufferSize);
@@ -1368,6 +1217,8 @@ namespace Skip {
 
     void VulkanSwapchain::createUniformBuffers() {
         // Currently using one buffer for each skip object
+        VkDevice logicalDevice = *_vkDevice->getLogicalDevice();
+        VkPhysicalDevice physicalDevice = _vkDevice->getPhysicalDevice();
         VkDeviceSize mvpbufferSize = sizeof(MvpBufferObject);
         VkDeviceSize lightBufferSize = sizeof(LightBufferObject);
         for (size_t i = 0; i < _scene->_objects.size(); i++) {
@@ -1378,12 +1229,12 @@ namespace Skip {
             _scene->_objects[i]->_lightUboBuffersMemory.resize(_swapChainImages.size());
 
             for (size_t j = 0; j < _swapChainImages.size(); j++) {
-                createBuffer(mvpbufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                createBuffer(physicalDevice, logicalDevice, mvpbufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, _scene->_objects[i]->_mvpUboBuffers[j],
                     _scene->_objects[i]->_mvpUboBuffersMemory[j]);
 
-                createBuffer(lightBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                createBuffer(physicalDevice, logicalDevice, lightBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, _scene->_objects[i]->_lightUboBuffers[j],
                     _scene->_objects[i]->_lightUboBuffersMemory[j]);
@@ -1396,7 +1247,7 @@ namespace Skip {
     void VulkanSwapchain::createDescriptorPool() {
         // describe descriptor types our sets are going to contain
         // Create pools for each ubos and sampler
-        std::array<VkDescriptorPoolSize, 3> poolSizes{};
+        std::array<VkDescriptorPoolSize, 4> poolSizes{};
 
         poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[0].descriptorCount = static_cast<uint32_t>(_swapChainImages.size());
@@ -1407,12 +1258,16 @@ namespace Skip {
         poolSizes[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         poolSizes[2].descriptorCount = static_cast<uint32_t>(_swapChainImages.size());
 
+        // TODO: Is this needed? This pool is used for imgui
+        poolSizes[3].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[3].descriptorCount = static_cast<uint32_t>(_swapChainImages.size());
+
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
         poolInfo.pPoolSizes = poolSizes.data();
-        poolInfo.maxSets = static_cast<uint32_t>(_swapChainImages.size());
+        poolInfo.maxSets = static_cast<uint32_t>(_swapChainImages.size()) + 1; // +1 for imgui
         // structure has optional flag to determine individual descriptor sets
         // can be freed or not: VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT
         poolInfo.flags = 0;
@@ -1492,76 +1347,68 @@ namespace Skip {
         }
     }
 
-    void VulkanSwapchain::createCommandBuffers() {
+    void VulkanSwapchain::allocateCommandBuffers() {
         _commandBuffers.resize(_swapChainFramebuffers.size());
-
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = _commandPool;
-        // levels can be primary or secondary
-        // primary - can be submitted to a queue for execution, but not called by other command buffers
-        // secondary - cannot be submitted directly, but can be called from primary command buffers
-        //             (useful for common operations from primary command buffers)
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = (uint32_t)_commandBuffers.size();
-
         if (vkAllocateCommandBuffers(*_vkDevice->getLogicalDevice(), &allocInfo, _commandBuffers.data()) != VK_SUCCESS) {
             throw std::runtime_error("Failed to allocate command buffers!");
         }
+    }
+
+    void VulkanSwapchain::buildCommandBuffers() {
+
+        std::array<VkClearValue, 2> clearValues{};
+        clearValues[0] = { 0.0f, 0.0f, 0.0f, 1.0f };
+        clearValues[1].depthStencil = { 1.0f, 0 };
+
+        VkRenderPassBeginInfo renderPassInfo{};
+        renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderPassInfo.renderPass = _renderPass;
+        renderPassInfo.renderArea.offset = { 0, 0 };
+        renderPassInfo.renderArea.extent = _swapChainExtent;
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+        _imguiContext->newFrame("test", "GPU_NAME", _frameTimer, true, _scene->_camera);
+        
+        _imguiContext->updateBuffers(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice());
 
         // Command Buffer Recording
         for (size_t i = 0; i < _commandBuffers.size(); i++) {
-            VkCommandBufferBeginInfo beginInfo{};
-            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            //flags specify how we're gonna use the command buffer
-            // VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT - Command buffer will be rerecorded after executing once
-            // VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT - this is a secondary command buffer
-            //                                                    that will be entirely within a single render pass
-            // VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT - Command buffer can be resubmitted while it
-            //                                                is also already pending execution
-            beginInfo.flags = 0; // optional
 
-            // pInheritenceInfo only relevant for secondary command buffers
-            // specifies which state to inherit from the calling primary command buffer
-            beginInfo.pInheritanceInfo = nullptr; // optional
+            renderPassInfo.framebuffer = _swapChainFramebuffers[i];
 
             if (vkBeginCommandBuffer(_commandBuffers[i], &beginInfo) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to begin recording command buffer!");
             }
-
-            // define clear values for VK_ATTACHMENT_LOAD_OP_CLEAR
-            // we use black with 100% opacity
-            std::array<VkClearValue, 2> clearValues{};
-            clearValues[0] = { 0.0f, 0.0f, 0.0f, 1.0f };
-            clearValues[1].depthStencil = { 1.0f, 0 };
-
-            // Render Pass
-            VkRenderPassBeginInfo renderPassInfo{};
-            renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-            renderPassInfo.renderPass = _renderPass;
-            renderPassInfo.framebuffer = _swapChainFramebuffers[i];
-
-            // size of render area. Where shader loads and stores will take place
-            // should match the size of attachments for best performance
-            renderPassInfo.renderArea.offset = { 0, 0 };
-            renderPassInfo.renderArea.extent = _swapChainExtent;
-
-            renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-            renderPassInfo.pClearValues = clearValues.data();
-
-            // final parameter controls how the drawing commands within the render
-            // pass will be provided:
-            // VK_SUBPASS_CONTENTS_INLINE: render pass commands will be embedded in primary cmd
-            //                             buffer and no secondary cmd buffers will be executed
-            // VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: render pass cmds will be executed
-            //                                                from secondary command buffers
+            
             vkCmdBeginRenderPass(_commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+            VkViewport viewport{};
+            viewport.width = _swapChainExtent.width;
+            viewport.height = _swapChainExtent.height;
+            viewport.minDepth = 0.0f;
+            viewport.maxDepth = 1.0f;
+            vkCmdSetViewport(_commandBuffers[i], 0, 1, &viewport);
+
+            VkRect2D scissor{};
+            scissor.extent.width = _swapChainExtent.width;
+            scissor.extent.height = _swapChainExtent.height;
+            scissor.offset.x = 0;
+            scissor.offset.y = 0;
+            vkCmdSetScissor(_commandBuffers[i], 0, 1, &scissor);
+
             //Basic Drawing Commands
+            vkCmdBindDescriptorSets(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _pipelineLayout, 0, 1, &_descriptorSets[i], 0, nullptr);
             vkCmdBindPipeline(_commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphicsPipeline);
-
-
-
+            
             for (size_t j = 0; j < _scene->_objects.size(); j++) {
                 VkDeviceSize offsets[] = { 0 };
                 
@@ -1579,8 +1426,10 @@ namespace Skip {
                     vkCmdDraw(_commandBuffers[i], _scene->_objects[j]->_vertices.size(), 1, 0, 0);
                 }
 
-
             }
+
+            _imguiContext->drawFrame(_commandBuffers[i]);
+
             vkCmdEndRenderPass(_commandBuffers[i]);
             if (vkEndCommandBuffer(_commandBuffers[i]) != VK_SUCCESS) {
                 throw std::runtime_error("Failed to record command buffer!");
@@ -1612,21 +1461,12 @@ namespace Skip {
                 throw std::runtime_error("Failed to create synchronization objects for a frame!");
             }
         }
-
     }
 
-    static std::vector<char> readFile(const std::string& filename) {
-        std::ifstream file(filename, std::ios::ate | std::ios::binary); // reads from the end
-        if (!file.is_open()) {
-            throw std::runtime_error("Failed to open file!");
-        }
-        size_t fileSize = (size_t)file.tellg();
-        std::vector<char> buffer(fileSize); // allocates size based on end
-        file.seekg(0);
-        file.read(buffer.data(), fileSize);
-
-        file.close();
-        return buffer;
+    void VulkanSwapchain::initImgui() {
+        _imguiContext = new ImguiContext();
+        _imguiContext->init((float)_swapChainExtent.width, (float)_swapChainExtent.height);
+        _imguiContext->initResources(*_vkDevice->getLogicalDevice(), _vkDevice->getPhysicalDevice(), _renderPass, _vkDevice->_queues.graphics, _commandPool, "resources/shaders/imgui", _vkDevice->_gpuInfo->msaaSamples);
     }
-
+    
 }

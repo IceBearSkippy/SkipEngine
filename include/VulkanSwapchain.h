@@ -14,9 +14,12 @@
 #include <chrono>
 #include <unordered_map>
 
+#include <ImguiContext.h>
 #include <VulkanDevice.h>
 #include <VulkanWindow.h>
 #include <objects/SkipObject.h>
+#include <imgui.h>
+
 namespace Skip {
 
     struct SwapchainDetails {
@@ -29,11 +32,17 @@ namespace Skip {
 
     public:
         VulkanSwapchain();
-        VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, SkipScene* scene);
+        VulkanSwapchain(VulkanDevice* vkDevice, VulkanWindow* vkWindow, VkInstance* instance, SkipScene* scene);
         ~VulkanSwapchain();
 
         VulkanDevice* _vkDevice = nullptr;
         VulkanWindow* _vkWindow = nullptr;
+
+        ImguiContext* _imguiContext = nullptr;
+
+        float _frameTimer = 0.0f;
+
+        VkInstance* _instance;
 
         VkSwapchainKHR _swapChain;
         std::vector<VkImage> _swapChainImages;
@@ -41,8 +50,10 @@ namespace Skip {
         VkExtent2D _swapChainExtent;
         std::vector<VkImageView> _swapChainImageViews;
         VkRenderPass _renderPass;
+        VkRenderPass _imguiRenderPass;
         VkDescriptorSetLayout _descriptorSetLayout;
         VkPipelineLayout _pipelineLayout;
+        VkPipelineCache _pipelineCache;
         VkPipeline _graphicsPipeline;
         VkCommandPool _commandPool;
         VkImage _colorImage;
@@ -56,6 +67,7 @@ namespace Skip {
         SwapchainDetails querySwapchain();
 
         VkDescriptorPool _descriptorPool;
+
         std::vector<VkDescriptorSet> _descriptorSets;
         std::vector<VkCommandBuffer> _commandBuffers;
 
@@ -75,11 +87,13 @@ namespace Skip {
 
         uint32_t stageFrame();
         void updateUniformBuffers(uint32_t currentImage);
-        void drawFrame(uint32_t currentImage);
+        void drawFrame(uint32_t currentImage, float deltaTime);
         void recreateSwapChain();
         void cleanupSwapChain();
-    private:
+
         VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+    private:
+       
         VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 
         void createSwapChain();
@@ -88,34 +102,29 @@ namespace Skip {
             uint32_t mipLevels);
 
         void createRenderPass();
+        void createPipelineCache();
         VkFormat findDepthFormat();
         VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, 
             VkFormatFeatureFlags features);
 
         void createDescriptorSetLayout();
         void createGraphicsPipeline();
-        VkShaderModule createShaderModule(const std::vector<char>& code);
-
         void createCommandPool();
-        VkCommandBuffer beginSingleTimeCommands();
-        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
 
         void createColorResources();
         void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format,
             VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-        uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-        bool hasStencilComponent(VkFormat format);
+        //bool hasStencilComponent(VkFormat format);
 
         void createDepthResources();
-        void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
-            VkImageLayout newLayout, uint32_t mipLevels);
+        //void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout,
+        //    VkImageLayout newLayout, uint32_t mipLevels);
 
         void createFramebuffers();
 
         // We are managing multiple textures using ModelObject struct
         void createTextureImages();
-        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
-            VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+        
         void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
         void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
         
@@ -130,9 +139,10 @@ namespace Skip {
         void createUniformBuffers();
         void createDescriptorPool();
         void createDescriptorSets();
-        void createCommandBuffers();
+        void allocateCommandBuffers();
+        void buildCommandBuffers();
         void createSyncObjects();
+        
+        void initImgui();
     };
-
-    static std::vector<char> readFile(const std::string& filename);
 }

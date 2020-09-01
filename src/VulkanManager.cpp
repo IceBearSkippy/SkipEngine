@@ -1,5 +1,5 @@
 #include <VulkanManager.h>
-
+#include <imgui.h>
 namespace Skip {
 
     
@@ -22,9 +22,7 @@ namespace Skip {
 
         this->createLogicalDevice();
 
-        _vulkanSwapchain = new VulkanSwapchain(_vulkanDevice, _window, scene);
-
-
+        _vulkanSwapchain = new VulkanSwapchain(_vulkanDevice, _window, &_instance, scene);
     }
 
     VulkanManager::~VulkanManager() {
@@ -44,8 +42,18 @@ namespace Skip {
         
     }
 
-    void VulkanManager::drawFrame(uint32_t currentImage) {
-        _vulkanSwapchain->drawFrame(currentImage);
+    void VulkanManager::drawFrame(uint32_t currentImage, float deltaTime) {
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2((float)_vulkanSwapchain->_swapChainExtent.width, (float)_vulkanSwapchain->_swapChainExtent.height);
+        io.DeltaTime = deltaTime;
+
+        io.MousePos = ImVec2(_window->mousePos.x, _window->mousePos.y);
+        io.MouseDown[0] = _window->mouseButtons.left;
+        io.MouseDown[1] = _window->mouseButtons.right;
+
+        _vulkanSwapchain->drawFrame(currentImage, deltaTime);
+        
+
     }
 
     bool VulkanManager::checkValidationLayerSupport() {
@@ -319,5 +327,9 @@ namespace Skip {
         vkGetDeviceQueue(_vulkanDevice->_logicalDevice, indices.presentFamily.value(), 0, &_vulkanDevice->_queues.graphics);
         vkGetDeviceQueue(_vulkanDevice->_logicalDevice, indices.presentFamily.value(), 0, &_vulkanDevice->_queues.present);
     }
+
+    
+
+    
 
 }

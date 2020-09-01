@@ -7,6 +7,8 @@
 
 #include <vulkan/vulkan.h>
 #include <string>
+#include <chrono>
+#include <thread>
 
 #include <SkipScene.h>
 
@@ -27,12 +29,18 @@ namespace Skip {
         unsigned int _height;
         std::string _title;
         
-        
-
+        bool _cameraActive = false;
         bool _framebufferResized = false;
         GLFWwindow* _glfw = nullptr;
         VkSurfaceKHR _surface = VK_NULL_HANDLE;
         SkipScene* _scene = nullptr;
+
+        glm::vec2 mousePos = glm::vec2(0, 0);
+        struct {
+            bool left = false;
+            bool right = false;
+            bool middle = false;
+        } mouseButtons;
         
     private:
         static void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mode);

@@ -54,9 +54,11 @@ namespace Skip {
         glm::vec3 GetFront();
 
         glm::vec3 GetUp();
+
+        glm::vec3 _position;
     private:
         // Camera Attributes
-        glm::vec3 _position;
+        
         glm::vec3 _front;
         glm::vec3 _up;
         glm::vec3 _right;
