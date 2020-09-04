@@ -18,7 +18,6 @@
 #include <VulkanDevice.h>
 #include <VulkanWindow.h>
 #include <objects/SkipObject.h>
-#include <imgui.h>
 
 namespace Skip {
 

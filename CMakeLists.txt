@@ -32,13 +32,12 @@ find_package( Vulkan REQUIRED )
 find_package( glfw3 REQUIRED )
 find_package( glm REQUIRED )
 find_package( tinyobjloader REQUIRED )
-find_package( imgui REQUIRED )
 
 list ( APPEND PROJECT_INCLUDE_DIRECTORIES
+  ${INCLUDE_FOLDER}
   ${SOURCE_FOLDER}
   ${LIBS_FOLDER}
-  ${VULKAN_SDK}/include
-  ${INCLUDE_FOLDER}
+  ${VULKAN_SDK}/include 
 )
 
 # copy over resources directory
@@ -46,6 +45,11 @@ file(COPY ${RESOURCES_FOLDER} DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${LIBS_FOLDER} DESTINATION ${CMAKE_BINARY_DIR})
 
 list ( APPEND PROJECT_EXECUTABLE_FILES
+  ${LIBS_FOLDER}/imgui/imgui.cpp
+  ${LIBS_FOLDER}/imgui/imgui_demo.cpp
+  ${LIBS_FOLDER}/imgui/imgui_draw.cpp
+  ${LIBS_FOLDER}/imgui/imgui_stdlib.cpp
+  ${LIBS_FOLDER}/imgui/imgui_widgets.cpp
   ${SOURCE_FOLDER}/VulkanWindow.cpp
   ${SOURCE_FOLDER}/VulkanDevice.cpp
   ${SOURCE_FOLDER}/ImguiContext.cpp
@@ -80,4 +84,5 @@ endif()
 target_link_libraries( ${APP_NAME} tinyobjloader::tinyobjloader )
 target_link_libraries( ${APP_NAME} glfw )
 target_link_libraries( ${APP_NAME} glm )
-target_link_libraries( ${APP_NAME} imgui::imgui )
+
+

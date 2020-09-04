@@ -68,7 +68,6 @@ namespace Skip {
 
     void ImguiContext::DestroyImguiContext(VkDevice device) {
         ImGui::DestroyContext();
-
         vertexBuffer.destroy();
         indexBuffer.destroy();
 
